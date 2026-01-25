@@ -7,6 +7,8 @@ import dotenv from "dotenv"
 import { Server } from 'socket.io';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import authRoutes from './routes/AuthRoutes.js';
+
 dotenv.config()
 
 const app = express();
@@ -45,6 +47,7 @@ const corsoptions = {
 }
 app.use(cors(corsoptions));
 app.set('trust proxy', 'loopback')
+app.use("/api/v1/auth", authRoutes);
 
 
 const limiter = rateLimit({
