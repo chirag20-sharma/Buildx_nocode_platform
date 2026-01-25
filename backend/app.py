@@ -1,3 +1,4 @@
+# app initialized
 from flask import Flask
 from db import users_collection
 
