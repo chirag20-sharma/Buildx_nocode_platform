@@ -3,9 +3,6 @@ import cors from 'cors';
 import http from 'http';
 import cookieParser from "cookie-parser";
 import { connect } from './config/database.js';
-import userRoutes from './routes/AuthRoutes.js';
-import projectRoutes from './routes/ProjectRoutes.js';
-import bidRoutes from './routes/BidRoutes.js';
 import dotenv from "dotenv"
 import { Server } from 'socket.io';
 import helmet from 'helmet';
@@ -49,15 +46,14 @@ const corsoptions = {
 app.use(cors(corsoptions));
 app.set('trust proxy', 'loopback')
 
-app.use("/api/v1/auth", userRoutes);
-app.use("/api/v1/gigs", projectRoutes);
-app.use("/api/v1/bids", bidRoutes);
+
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 15,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
 })
+
 app.get('/', limiter, (req, res) => {
     return res.json({
         success: true,
