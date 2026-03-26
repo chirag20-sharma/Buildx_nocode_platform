@@ -1,36 +1,89 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState, useRef, useEffect } from "react";
+import SignIn from "./SignIn";
+import SignUp from "./SignUp";
+import Dashboard from "./Dashboard";
+import Builder from "./Builder";
 
-function App() {
-  const [count, setCount] = useState(0)
+const API = "http://localhost:5000/api/v1";
+
+export default function App() {
+  const storedToken = localStorage.getItem("token") || "";
+  const [page, setPage] = useState(storedToken ? "checking" : "signin");
+  const [token, setToken] = useState(storedToken);
+  const [user, setUser] = useState(null);
+  const [editProjectId, setEditProjectId] = useState(null);
+  const onBackCallback = useRef(null);
+
+  useEffect(() => {
+    if (page !== "checking") return;
+    fetch(`${API}/projects`, {
+      headers: { Authorization: `Bearer ${storedToken}` },
+      credentials: "include",
+    })
+      .then((r) => {
+        if (r.status === 401) {
+          localStorage.removeItem("token");
+          setToken("");
+          setPage("signin");
+        } else {
+          setPage("dashboard");
+        }
+      })
+      .catch(() => setPage("dashboard"));
+  }, []);
+
+  const handleAuth = (t, u) => {
+    setToken(t);
+    setUser(u);
+    setPage("dashboard");
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    setToken("");
+    setUser(null);
+    setPage("signin");
+  };
+
+  // projectId = null means new project, string means edit existing
+  const handleOpenBuilder = (onReturnCallback, projectId = null) => {
+    onBackCallback.current = onReturnCallback || null;
+    setEditProjectId(projectId);
+    setPage("builder");
+  };
+
+  const handleBuilderBack = () => {
+    setPage("dashboard");
+    setEditProjectId(null);
+    if (onBackCallback.current) {
+      onBackCallback.current();
+      onBackCallback.current = null;
+    }
+  };
+
+  if (page === "checking")
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f0f13" }}>
+        <div style={{ width: 32, height: 32, border: "3px solid #1e1e2e", borderTopColor: "#6366f1", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+
+  if (page === "signin")
+    return <SignIn onAuth={handleAuth} goToSignUp={() => setPage("signup")} />;
+
+  if (page === "signup")
+    return <SignUp onAuth={handleAuth} goToSignIn={() => setPage("signin")} />;
+
+  if (page === "builder")
+    return <Builder token={token} projectId={editProjectId} onBack={handleBuilderBack} />;
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <h1>Hello</h1>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <Dashboard
+      token={token}
+      user={user}
+      onLogout={handleLogout}
+      onOpenBuilder={handleOpenBuilder}
+    />
+  );
 }
-
-export default App
