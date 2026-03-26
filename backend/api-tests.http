@@ -1,0 +1,261 @@
+### BuildX API Testing Guide
+### Base URL: http://localhost:5000
+
+### 1. Test Server Health
+GET http://localhost:5000/
+
+###
+
+### 2. User Registration
+POST http://localhost:5000/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "123456"
+}
+
+###
+
+### 3. User Login
+POST http://localhost:5000/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "john@example.com",
+  "password": "123456"
+}
+
+###
+
+### 4. User Logout
+POST http://localhost:5000/api/v1/auth/logout
+
+###
+
+### 5. Create New Project (requires login)
+POST http://localhost:5000/api/v1/projects
+Content-Type: application/json
+
+{
+  "name": "My Landing Page",
+  "description": "A beautiful landing page for my business",
+  "components": [
+    {
+      "id": "header-1",
+      "type": "navbar",
+      "properties": {
+        "title": "My Business",
+        "links": ["Home", "About", "Contact"]
+      },
+      "styles": {
+        "backgroundColor": "#ffffff",
+        "color": "#333333"
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "hero-1",
+      "type": "text",
+      "properties": {
+        "content": "Welcome to My Business",
+        "fontSize": "48px"
+      },
+      "styles": {
+        "textAlign": "center",
+        "color": "#2563eb"
+      },
+      "position": {
+        "x": 0,
+        "y": 100
+      }
+    },
+    {
+      "id": "cta-button-1",
+      "type": "button",
+      "properties": {
+        "text": "Get Started",
+        "action": "redirect",
+        "url": "/signup"
+      },
+      "styles": {
+        "backgroundColor": "#2563eb",
+        "color": "white",
+        "padding": "12px 24px",
+        "borderRadius": "8px"
+      },
+      "position": {
+        "x": 50,
+        "y": 200
+      }
+    }
+  ],
+  "settings": {
+    "theme": "light",
+    "layout": "responsive"
+  }
+}
+
+###
+
+### 6. Get All User Projects (requires login)
+GET http://localhost:5000/api/v1/projects
+
+###
+
+### 7. Get Single Project by ID (requires login)
+# Replace {project_id} with actual project ID from previous response
+GET http://localhost:5000/api/v1/projects/{project_id}
+
+###
+
+### 8. Update Project (requires login)
+# Replace {project_id} with actual project ID
+PUT http://localhost:5000/api/v1/projects/{project_id}
+Content-Type: application/json
+
+{
+  "name": "Updated Landing Page",
+  "description": "Updated description for my landing page",
+  "components": [
+    {
+      "id": "header-1",
+      "type": "navbar",
+      "properties": {
+        "title": "Updated Business Name",
+        "links": ["Home", "About", "Services", "Contact"]
+      },
+      "styles": {
+        "backgroundColor": "#1f2937",
+        "color": "#ffffff"
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ]
+}
+
+###
+
+### 9. Publish/Unpublish Project (requires login)
+# Replace {project_id} with actual project ID
+PATCH http://localhost:5000/api/v1/projects/{project_id}/publish
+
+###
+
+### 10. Delete Project (requires login)
+# Replace {project_id} with actual project ID
+DELETE http://localhost:5000/api/v1/projects/{project_id}
+
+###
+
+### Testing with Authorization Header (Alternative to cookies)
+### If you prefer to use Authorization header instead of cookies:
+
+### Login and copy the token from response, then use it like this:
+POST http://localhost:5000/api/v1/projects
+Content-Type: application/json
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+{
+  "name": "Test Project with Bearer Token",
+  "description": "Testing with Authorization header"
+}
+
+###
+
+### Error Testing Examples
+
+### 11. Test Invalid Login
+POST http://localhost:5000/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "wrong@example.com",
+  "password": "wrongpassword"
+}
+
+###
+
+### 12. Test Duplicate Registration
+POST http://localhost:5000/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "123456"
+}
+
+###
+
+### 13. Test Unauthorized Access (without login)
+GET http://localhost:5000/api/v1/projects
+
+###
+
+
+### TEMPLATE ENDPOINTS
+
+### 14. Get All Templates (Public)
+GET http://localhost:5000/api/v1/templates
+
+###
+
+### 15. Get Templates by Category
+GET http://localhost:5000/api/v1/templates?category=landing-page
+
+###
+
+### 16. Get Single Template
+GET http://localhost:5000/api/v1/templates/TEMPLATE_ID_HERE
+
+###
+
+### 17. Use Template to Create Project (requires login)
+POST http://localhost:5000/api/v1/templates/TEMPLATE_ID_HERE/use
+Content-Type: application/json
+
+{
+  "projectName": "My New Project from Template"
+}
+
+###
+
+### 18. Create New Template (requires login)
+POST http://localhost:5000/api/v1/templates
+Content-Type: application/json
+
+{
+  "name": "Custom Template",
+  "description": "My custom template",
+  "category": "landing-page",
+  "components": [
+    {
+      "id": "custom-1",
+      "type": "text",
+      "properties": {
+        "content": "Custom Content"
+      },
+      "styles": {
+        "color": "blue"
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "settings": {
+    "theme": "light",
+    "layout": "responsive"
+  }
+}
+
+###

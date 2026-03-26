@@ -1,26 +1,24 @@
-
 import express from "express";
-import { rateLimit } from 'express-rate-limit'
-import { login , signup} from "../controllers/AuthController.js";
+import { rateLimit } from 'express-rate-limit';
+import { login, signup, logout } from "../controllers/AuthController.js";
 
 const router = express.Router();
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 15,
-    standardHeaders: 'draft-8',
-    legacyHeaders: false,
-})
-const UserFetchLimiter = rateLimit({
-    windowMs: 10 * 60 * 1000,
-    limit: 30,
-    standardHeaders: 'draft-8',
-    legacyHeaders: false,
-})
 
-router.post("/login", limiter, login);
+// Rate limiting for auth routes (disabled for development)
+// const authLimiter = rateLimit({
+//     windowMs: 15 * 60 * 1000,
+//     limit: 5,
+//     message: {
+//         success: false,
+//         message: "Too many authentication attempts. Please try again later."
+//     },
+//     standardHeaders: 'draft-8',
+//     legacyHeaders: false,
+// });
 
-router.post("/signup", limiter, signup);
-
+// Auth Routes
+router.post("/signup", signup);
+router.post("/login", login);
+router.post("/logout", logout);
 
 export default router;
-
