@@ -1,0 +1,200 @@
+{
+  "info": {
+    "name": "BuildX API Collection",
+    "description": "Complete API collection for BuildX no-code platform",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "User Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "signup"]
+            }
+          }
+        },
+        {
+          "name": "User Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "User Logout",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Projects",
+      "item": [
+        {
+          "name": "Create Project",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"My Landing Page\",\n  \"description\": \"A beautiful landing page\",\n  \"components\": [\n    {\n      \"id\": \"header-1\",\n      \"type\": \"navbar\",\n      \"properties\": {\n        \"title\": \"My Business\",\n        \"links\": [\"Home\", \"About\", \"Contact\"]\n      },\n      \"styles\": {\n        \"backgroundColor\": \"#ffffff\",\n        \"color\": \"#333333\"\n      },\n      \"position\": {\n        \"x\": 0,\n        \"y\": 0\n      }\n    }\n  ],\n  \"settings\": {\n    \"theme\": \"light\",\n    \"layout\": \"responsive\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "projects"]
+            }
+          }
+        },
+        {
+          "name": "Get All Projects",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "projects"]
+            }
+          }
+        },
+        {
+          "name": "Get Project by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/projects/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "projects", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "PROJECT_ID_HERE"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Project",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Project Name\",\n  \"description\": \"Updated description\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/projects/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "projects", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "PROJECT_ID_HERE"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Toggle Publish Project",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/projects/:id/publish",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "projects", ":id", "publish"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "PROJECT_ID_HERE"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Project",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/projects/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "projects", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "PROJECT_ID_HERE"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Server Health",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/",
+          "host": ["{{baseUrl}}"],
+          "path": [""]
+        }
+      }
+    }
+  ]
+}
