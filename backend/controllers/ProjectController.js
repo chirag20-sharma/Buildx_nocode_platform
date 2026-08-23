@@ -149,7 +149,7 @@ export const togglePublishProject = async (req, res) => {
         
         // Generate or remove published URL
         if (project.isPublished) {
-            project.publishedUrl = `https://buildx.com/p/${project._id}`;
+            project.publishedUrl = `/p/${project._id}`;
         } else {
             project.publishedUrl = null;
         }
@@ -165,5 +165,27 @@ export const togglePublishProject = async (req, res) => {
     } catch (error) {
         console.log('Toggle publish error:', error);
         return respond(res, "Error occurred while updating project status", 500, false);
+    }
+};
+
+// Get a single published project by ID (public access, no auth required)
+export const getPublicProjectById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const project = await Project.findOne({ _id: id, isPublished: true })
+            .select('name description components settings isPublished publishedUrl createdAt updatedAt');
+        
+        if (!project) {
+            return respond(res, "This website is either private, unpublished, or does not exist.", 404, false);
+        }
+        
+        return respond(res, "Published website loaded successfully", 200, true, {
+            project
+        });
+        
+    } catch (error) {
+        console.log('Get public project error:', error);
+        return respond(res, "Error occurred while fetching website", 500, false);
     }
 };

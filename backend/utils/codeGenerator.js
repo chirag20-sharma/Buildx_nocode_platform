@@ -1,14 +1,27 @@
 // Maps component type → HTML tag + class
 const COMP_MAP = {
-  navbar:    (c) => `  <nav class="bx-navbar">${c.properties?.text || "Navigation"}</nav>`,
-  hero:      (c) => `  <section class="bx-hero"><h1>${c.properties?.text || c.properties?.content || "Hero Title"}</h1></section>`,
-  header:    (c) => `  <header class="bx-header"><h2>${c.properties?.text || c.properties?.content || "Header"}</h2></header>`,
-  button:    (c) => `  <button class="bx-button">${c.properties?.text || "Button"}</button>`,
-  text:      (c) => `  <p class="bx-text">${c.properties?.text || c.properties?.content || "Text block"}</p>`,
-  image:     (c) => `  <img class="bx-image" src="${c.properties?.src || ""}" alt="${c.properties?.alt || "Image"}" />`,
-  card:      (c) => `  <div class="bx-card"><h3>${c.properties?.text || c.properties?.title || "Card Title"}</h3><p>Card content goes here.</p></div>`,
-  container: (c) => `  <div class="bx-container">${c.properties?.text || ""}</div>`,
-  footer:    (c) => `  <footer class="bx-footer">${c.properties?.text || "Footer"}</footer>`,
+  navbar:      (c) => `  <nav class="bx-navbar">${c.properties?.text || "Navigation"}</nav>`,
+  hero:        (c) => `  <section class="bx-hero"><h1>${c.properties?.text || c.properties?.content || "Hero Title"}</h1></section>`,
+  header:      (c) => `  <header class="bx-header"><h2>${c.properties?.text || c.properties?.content || "Header"}</h2></header>`,
+  button:      (c) => `  <button class="bx-button">${c.properties?.text || "Button"}</button>`,
+  text:        (c) => `  <p class="bx-text">${c.properties?.text || c.properties?.content || "Text block"}</p>`,
+  image:       (c) => `  <img class="bx-image" src="${c.properties?.src || ""}" alt="${c.properties?.alt || "Image"}" />`,
+  card:        (c) => `  <div class="bx-card"><h3>${c.properties?.text || c.properties?.title || "Card Title"}</h3><p>Card content goes here.</p></div>`,
+  container:   (c) => `  <div class="bx-container">${c.properties?.text || ""}</div>`,
+  footer:      (c) => `  <footer class="bx-footer">${c.properties?.text || "Footer"}</footer>`,
+  productGrid: (c) => {
+    const grid = c.properties?.grid || { items: [] };
+    const cards = (grid.items || []).map(item => `
+    <div class="bx-product-card">
+      <div class="bx-product-img">${item.src ? `<img src="${item.src}" alt="${item.name || 'Product'}" />` : '<div class="bx-img-placeholder">🖼 Product Image</div>'}</div>
+      <div class="bx-product-info">
+        <h4>${item.name || 'Product Name'}</h4>
+        <div class="bx-product-price">${item.price || '$0.00'}</div>
+        <button class="bx-button bx-cart-btn">${item.btn || 'Add to Cart'}</button>
+      </div>
+    </div>`).join("\n");
+    return `  <section class="bx-product-grid-section">\n  <div class="bx-product-grid" style="grid-template-columns: repeat(auto-fit, minmax(${grid.imgW || 240}px, 1fr)); gap: ${grid.gap || 20}px;">\n${cards}\n  </div>\n  </section>`;
+  }
 };
 
 export function generateHTML(project) {
@@ -156,6 +169,81 @@ body {
   padding: 24px 32px;
 }
 
+/* Product Grid */
+.bx-product-grid-section {
+  max-width: 1100px;
+  margin: 40px auto;
+  padding: 0 24px;
+}
+
+.bx-product-grid {
+  display: grid;
+  gap: 24px;
+}
+
+.bx-product-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+.bx-product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.08);
+}
+
+.bx-product-img {
+  width: 100%;
+  height: 220px;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.bx-product-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bx-img-placeholder {
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.bx-product-info {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.bx-product-info h4 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.bx-product-price {
+  font-size: 18px;
+  font-weight: 800;
+  color: #059669;
+}
+
+.bx-cart-btn {
+  margin: 8px 0 0 0;
+  width: 100%;
+}
+
 /* Footer */
 .bx-footer {
   width: 100%;
@@ -171,7 +259,7 @@ body {
 @media (max-width: 640px) {
   .bx-hero h1 { font-size: 32px; }
   .bx-header h2 { font-size: 24px; }
-  .bx-button { width: calc(100% - 64px); text-align: center; }
+  .bx-button { width: 100%; margin: 8px 0; text-align: center; }
 }
 `;
 }

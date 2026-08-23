@@ -5,13 +5,17 @@ import {
     getProjectById, 
     updateProject, 
     deleteProject, 
-    togglePublishProject 
+    togglePublishProject,
+    getPublicProjectById
 } from '../controllers/ProjectController.js';
 import { verifyToken } from '../middlewares/AuthMiddleware.js';
 
 const router = express.Router();
 
-// All project routes require authentication
+// Public route - anyone can view published projects without authentication
+router.get('/public/:id', getPublicProjectById); // GET /api/v1/projects/public/:id
+
+// Protected project routes require authentication
 router.use(verifyToken);
 
 // Project Routes
