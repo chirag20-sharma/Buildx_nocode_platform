@@ -23,7 +23,7 @@ function getSnapPosition(x, y, w, h, others) {
 }
 
 // ── Product Grid Component ──
-function ImageGrid({ grid, onUpdate, onRemove }) {
+function ImageGrid({ grid, onUpdate, onRemove, isPreview = false }) {
   const { cols, gap, imgW, imgH, items } = grid;
 
   const updateItem = (idx, field, val) =>
@@ -39,6 +39,35 @@ function ImageGrid({ grid, onUpdate, onRemove }) {
 
   const addItem = () => onUpdate({ ...grid, items: [...items, { src:"", name:"Product Name", price:"$0.00", btn:"Add to Cart" }] });
   const removeItem = (idx) => onUpdate({ ...grid, items: items.filter((_,i) => i !== idx) });
+
+  if (isPreview) {
+    return (
+      <div className="ig-block ig-block-preview">
+        <div className="ig-cells" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(${Math.min(imgW, 260)}px, 1fr))`, gap }}>
+          {items.map((item, idx) => (
+            <div key={idx} className="ig-product-card ig-product-card-preview">
+              <div className="ig-cell" style={{ height: imgH }}>
+                {item.src ? (
+                  <img src={item.src} alt={item.name} className="ig-img" />
+                ) : (
+                  <div className="ig-img-placeholder">
+                    <span>🖼 No image</span>
+                  </div>
+                )}
+              </div>
+              <div className="ig-info">
+                <div className="ig-preview-title">{item.name || "Product Name"}</div>
+                <div className="ig-preview-price">{item.price || "$0.00"}</div>
+                <button className="ig-btn-preview" onClick={() => alert(`Added "${item.name || 'Product'}" to cart!`)}>
+                  {item.btn || "Add to Cart"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="ig-block">
@@ -162,10 +191,11 @@ const LIBRARY = {
 const WEBSITE_TYPES = ["Landing Page", "Portfolio", "E-commerce", "Blog"];
 const TYPE_ICONS = { "Landing Page": "🚀", "Portfolio": "💼", "E-commerce": "🛒", "Blog": "📝" };
 
-function renderComponent(comp, selected, onSelect, onDragMove, onDragEnd, onEdit, editingId, onImageUpload) {
-  const isEditing = editingId === comp.id;
+function renderComponent(comp, selected, onSelect, onDragMove, onDragEnd, onEdit, editingId, onImageUpload, isPreview = false) {
+  const isEditing = !isPreview && editingId === comp.id;
 
   const handlePointerDown = (e) => {
+    if (isPreview) return;
     if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "LABEL") return;
     e.preventDefault();
     e.stopPropagation();
@@ -175,9 +205,17 @@ function renderComponent(comp, selected, onSelect, onDragMove, onDragEnd, onEdit
 
   const inner = () => {
     if (comp.type === "image") {
-      return comp.props.src ? (
-        <img src={comp.props.src} alt={comp.props.alt} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4, display: "block" }} />
-      ) : (
+      if (comp.props.src) {
+        return <img src={comp.props.src} alt={comp.props.alt || "Image"} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4, display: "block" }} />;
+      }
+      if (isPreview) {
+        return (
+          <div className="comp-img-placeholder">
+            <span>🖼 Image Placeholder</span>
+          </div>
+        );
+      }
+      return (
         <label className="comp-img-upload-zone" onClick={(e) => e.stopPropagation()}>
           <svg viewBox="0 0 24 24" fill="none" width="32" height="32">
             <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5"/>
@@ -218,13 +256,18 @@ function renderComponent(comp, selected, onSelect, onDragMove, onDragEnd, onEdit
   return (
     <div
       key={comp.id}
-      className={`canvas-comp comp-${comp.type}${selected ? " selected" : ""}`}
+      className={`canvas-comp comp-${comp.type}${!isPreview && selected ? " selected" : ""}${isPreview ? " preview-comp" : ""}`}
       style={{ left: comp.x, top: comp.y, width: comp.w, height: comp.h }}
       onPointerDown={handlePointerDown}
-      onDoubleClick={(e) => { e.stopPropagation(); onSelect(comp.id); onEdit(comp.id, null); }}
+      onDoubleClick={(e) => {
+        if (isPreview) return;
+        e.stopPropagation();
+        onSelect(comp.id);
+        onEdit(comp.id, null);
+      }}
     >
       {inner()}
-      {selected && (
+      {!isPreview && selected && (
         <>
           {["nw","n","ne","e","se","s","sw","w"].map((dir) => (
             <div key={dir} className={`resize-handle r-${dir}`}
@@ -253,6 +296,8 @@ export default function Builder({ token, projectId, onBack }) {
   const [imageGrids, setImageGrids] = useState([]);
   const [currentProjectId, setCurrentProjectId] = useState(projectId || null);
   const [projectName, setProjectName] = useState("");
+  const [isPreview, setIsPreview] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState("desktop");
 
   const canvasRef = useRef(null);
   const dragState = useRef(null);
@@ -274,16 +319,27 @@ export default function Builder({ token, projectId, onBack }) {
           const types = ["Landing Page", "Portfolio", "E-commerce", "Blog"];
           const matched = types.find(t => p.name.includes(t)) || "Landing Page";
           setWebsiteType(matched);
-          // Map saved components back to canvas format
-          const mapped = (p.components || []).map((c, i) => ({
-            id: c.id || `${c.type}-${i}`,
-            type: c.type,
-            x: c.position?.x ?? i * 20,
-            y: c.position?.y ?? i * 60,
-            w: c.styles?.width ?? 280,
-            h: c.styles?.height ?? 60,
-            props: c.properties || {},
-          }));
+          
+          // Restore product grids
+          const savedGrids = (p.components || [])
+            .filter((c) => c.type === "productGrid" && c.properties?.grid)
+            .map((c) => c.properties.grid);
+          if (savedGrids.length > 0) {
+            setImageGrids(savedGrids);
+          }
+
+          // Map saved regular components back to canvas format
+          const mapped = (p.components || [])
+            .filter((c) => c.type !== "productGrid")
+            .map((c, i) => ({
+              id: c.id || `${c.type}-${i}`,
+              type: c.type,
+              x: c.position?.x ?? i * 20,
+              y: c.position?.y ?? i * 60,
+              w: c.styles?.width ?? 280,
+              h: c.styles?.height ?? 60,
+              props: c.properties || {},
+            }));
           setComponents(mapped);
         }
       } catch {}
@@ -462,24 +518,35 @@ export default function Builder({ token, projectId, onBack }) {
     }
   };
 
-  const ALLOWED_TYPES = ["button","input","text","image","container","form","navbar","footer","hero","header","card"];
+  const ALLOWED_TYPES = ["button","input","text","image","container","form","navbar","footer","hero","header","card","productGrid"];
 
   const saveProject = async () => {
-    if (components.length === 0) { showToast("Add components first", "error"); return; }
+    if (components.length === 0 && imageGrids.length === 0) { showToast("Add components or products first", "error"); return; }
     if (!token) { showToast("Not logged in", "error"); return; }
     setSaving(true);
     try {
       const name = projectName || `${websiteType} ${new Date().toLocaleDateString()}`;
+      
+      const regularComps = components.map((c) => ({
+        id: c.id || `comp-${Date.now()}`,
+        type: ALLOWED_TYPES.includes(c.type) ? c.type : "container",
+        properties: c.props || {},
+        position: { x: c.x || 0, y: c.y || 0 },
+        styles: { width: c.w, height: c.h },
+      }));
+
+      const gridComps = imageGrids.map((g) => ({
+        id: g.id || `grid-${Date.now()}`,
+        type: "productGrid",
+        properties: { grid: g },
+        position: { x: 0, y: 0 },
+        styles: { width: 1000, height: 300 },
+      }));
+
       const body = {
         name: name.length >= 2 ? name : "My Project",
         description: "Created with BuildX builder",
-        components: components.map((c) => ({
-          id: c.id || `comp-${Date.now()}`,
-          type: ALLOWED_TYPES.includes(c.type) ? c.type : "container",
-          properties: c.props || {},
-          position: { x: c.x || 0, y: c.y || 0 },
-          styles: { width: c.w, height: c.h },
-        })),
+        components: [...regularComps, ...gridComps],
       };
 
       const isUpdate = !!currentProjectId;
@@ -550,213 +617,266 @@ export default function Builder({ token, projectId, onBack }) {
   const selectedComp = components.find((c) => c.id === selected);
 
   return (
-    <div className="builder-root">
+    <div className={`builder-root ${isPreview ? "is-preview" : ""}`}>
       {toast && <div className={`builder-toast ${toast.type}`}>{toast.msg}</div>}
 
       {/* Top bar */}
-      <header className="builder-topbar">
-        <div className="builder-topbar-left">
-          <button className="builder-back-btn" onClick={onBack}>
-            <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd"/></svg>
-          </button>
-          <div className="builder-topbar-title">
-            <span className="builder-topbar-icon">{TYPE_ICONS[websiteType]}</span>
-            <input
-              className="builder-name-input"
-              value={projectName || websiteType}
-              onChange={(e) => setProjectName(e.target.value)}
-              placeholder="Project name"
-            />
+      {isPreview ? (
+        <header className="builder-topbar builder-topbar-preview">
+          <div className="preview-topbar-left">
+            <span className="preview-mode-tag">👁 Preview Mode</span>
+            <span className="preview-project-name">{projectName || websiteType}</span>
           </div>
-        </div>
 
-        <div className="builder-ai-bar">
-          <input
-            value={aiPrompt}
-            onChange={(e) => setAiPrompt(e.target.value)}
-            placeholder="Describe a layout with AI…"
-            onKeyDown={(e) => e.key === "Enter" && generateWithAI()}
-          />
-          <button onClick={generateWithAI} disabled={aiLoading} className="ai-gen-btn">
-            {aiLoading ? <span className="spinner-sm" /> : "✦ Generate"}
-          </button>
-        </div>
-
-        <div className="builder-topbar-right">
-          <button className="builder-clear-btn" onClick={() => { setComponents([]); setSelected(null); }}>Clear</button>
-          <button className="builder-save-btn" onClick={saveProject} disabled={saving}>
-            {saving ? <span className="spinner-sm" /> : "Save project"}
-          </button>
-        </div>
-      </header>
-
-      <div className="builder-body">
-        {/* Sidebar */}
-        <aside className="builder-sidebar">
-          <div className="builder-sidebar-section">
-            <div className="builder-sidebar-label">Components</div>
-            {(LIBRARY[websiteType] || []).map((comp, i) => (
-              <div key={i} className="sidebar-comp-item" draggable
-                onDragStart={(e) => handleSidebarDragStart(e, comp)}>
-                <span className="sidebar-comp-icon">{comp.icon}</span>
-                <span className="sidebar-comp-label">{comp.label}</span>
-                <span className="sidebar-comp-size">{comp.defaultW}×{comp.defaultH}</span>
-              </div>
-            ))}
-            <button className="sidebar-grid-btn" onClick={addImageGrid}>
-              ⊞ Add Image Grid
+          <div className="preview-device-switcher">
+            <button
+              className={`preview-device-btn ${previewDevice === "desktop" ? "active" : ""}`}
+              onClick={() => setPreviewDevice("desktop")}
+              title="Desktop view (Full Width)"
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+                <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v8a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm1 1v6h12V5H4zm-2 9a1 1 0 011-1h14a1 1 0 110 2H3a1 1 0 01-1-1z" clipRule="evenodd"/>
+              </svg>
+              <span>Desktop</span>
+            </button>
+            <button
+              className={`preview-device-btn ${previewDevice === "tablet" ? "active" : ""}`}
+              onClick={() => setPreviewDevice("tablet")}
+              title="Tablet view (768px)"
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+                <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6zm0 2h8v10H6V4zm4 12a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/>
+              </svg>
+              <span>Tablet (768px)</span>
+            </button>
+            <button
+              className={`preview-device-btn ${previewDevice === "mobile" ? "active" : ""}`}
+              onClick={() => setPreviewDevice("mobile")}
+              title="Mobile view (375px)"
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+                <path fillRule="evenodd" d="M7 2a2 2 0 00-2 2v12a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2H7zm0 2h6v10H7V4zm3 12a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/>
+              </svg>
+              <span>Mobile (375px)</span>
             </button>
           </div>
 
-          {selectedComp && (
-            <div className="builder-sidebar-section builder-props-panel">
-              <div className="builder-sidebar-label">Properties</div>
-              <div className="prop-row">
-                <span>Type</span>
-                <span className="prop-val">{selectedComp.type}</span>
-              </div>
-              <div className="prop-row">
-                <span>X</span>
-                <input type="number" value={selectedComp.x}
-                  onChange={(e) => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, x: snap(+e.target.value) } : c))}
-                />
-              </div>
-              <div className="prop-row">
-                <span>Y</span>
-                <input type="number" value={selectedComp.y}
-                  onChange={(e) => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, y: snap(+e.target.value) } : c))}
-                />
-              </div>
-              <div className="prop-row prop-row-full">
-                <div className="prop-slider-label"><span>W</span><span className="prop-val">{selectedComp.w}px</span></div>
-                <input type="range" min={40} max={900} step={16} value={selectedComp.w}
-                  className="prop-slider"
-                  onChange={(e) => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, w: +e.target.value } : c))}
-                />
-              </div>
-              <div className="prop-row prop-row-full">
-                <div className="prop-slider-label"><span>H</span><span className="prop-val">{selectedComp.h}px</span></div>
-                <input type="range" min={24} max={800} step={16} value={selectedComp.h}
-                  className="prop-slider"
-                  onChange={(e) => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, h: +e.target.value } : c))}
-                />
-              </div>
-              <div className="prop-section-label">Quick align</div>
-              <div className="prop-align-row">
-                {[16,24,32,48].map(gap => (
-                  <button key={gap} className="prop-gap-btn"
-                    title={`Move right by ${gap}px`}
-                    onClick={() => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, x: c.x + gap } : c))}>
-                    +{gap}
-                  </button>
-                ))}
-              </div>
-              <div className="prop-align-row" style={{marginTop:4}}>
-                <button className="prop-align-btn" title="Align left edge to 0"
-                  onClick={() => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, x: 0 } : c))}>⇤ Left</button>
-                <button className="prop-align-btn" title="Center horizontally"
-                  onClick={() => {
-                    const cw = canvasRef.current?.offsetWidth || 800;
-                    setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, x: snap((cw - c.w) / 2) } : c));
-                  }}>⊕ Center</button>
-                <button className="prop-align-btn" title="Align top edge to 0"
-                  onClick={() => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, y: 0 } : c))}>⇡ Top</button>
-              </div>
-              {selectedComp.type !== "image" && (
-                <div className="prop-row prop-row-full">
-                  <span>Text</span>
-                  <input
-                    type="text"
-                    value={selectedComp.props.text || ""}
-                    onChange={(e) => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, props: { ...c.props, text: e.target.value } } : c))}
+          <div className="preview-topbar-right">
+            <button className="preview-exit-btn" onClick={() => setIsPreview(false)}>
+              ✕ Exit Preview
+            </button>
+          </div>
+        </header>
+      ) : (
+        <header className="builder-topbar">
+          <div className="builder-topbar-left">
+            <button className="builder-back-btn" onClick={onBack}>
+              <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd"/></svg>
+            </button>
+            <div className="builder-topbar-title">
+              <span className="builder-topbar-icon">{TYPE_ICONS[websiteType]}</span>
+              <input
+                className="builder-name-input"
+                value={projectName || websiteType}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="Project name"
+              />
+            </div>
+          </div>
+
+          <div className="builder-ai-bar">
+            <input
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              placeholder="Describe a layout with AI…"
+              onKeyDown={(e) => e.key === "Enter" && generateWithAI()}
+            />
+            <button onClick={generateWithAI} disabled={aiLoading} className="ai-gen-btn">
+              {aiLoading ? <span className="spinner-sm" /> : "✦ Generate"}
+            </button>
+          </div>
+
+          <div className="builder-topbar-right">
+            <button className="builder-preview-btn" onClick={() => { setSelected(null); setIsPreview(true); }}>
+              👁 Preview
+            </button>
+            <button className="builder-clear-btn" onClick={() => { setComponents([]); setSelected(null); }}>Clear</button>
+            <button className="builder-save-btn" onClick={saveProject} disabled={saving}>
+              {saving ? <span className="spinner-sm" /> : "Save project"}
+            </button>
+          </div>
+        </header>
+      )}
+
+      <div className={`builder-body ${isPreview ? "preview-active" : ""}`}>
+        {/* Sidebar */}
+        {!isPreview && (
+          <aside className="builder-sidebar">
+            <div className="builder-sidebar-section">
+              <div className="builder-sidebar-label">Components</div>
+              {(LIBRARY[websiteType] || []).map((comp, i) => (
+                <div key={i} className="sidebar-comp-item" draggable
+                  onDragStart={(e) => handleSidebarDragStart(e, comp)}>
+                  <span className="sidebar-comp-icon">{comp.icon}</span>
+                  <span className="sidebar-comp-label">{comp.label}</span>
+                  <span className="sidebar-comp-size">{comp.defaultW}×{comp.defaultH}</span>
+                </div>
+              ))}
+              <button className="sidebar-grid-btn" onClick={addImageGrid}>
+                ⊞ Add Image Grid
+              </button>
+            </div>
+
+            {selectedComp && (
+              <div className="builder-sidebar-section builder-props-panel">
+                <div className="builder-sidebar-label">Properties</div>
+                <div className="prop-row">
+                  <span>Type</span>
+                  <span className="prop-val">{selectedComp.type}</span>
+                </div>
+                <div className="prop-row">
+                  <span>X</span>
+                  <input type="number" value={selectedComp.x}
+                    onChange={(e) => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, x: snap(+e.target.value) } : c))}
                   />
                 </div>
-              )}
-              {selectedComp.type === "image" && (
-                <>
+                <div className="prop-row">
+                  <span>Y</span>
+                  <input type="number" value={selectedComp.y}
+                    onChange={(e) => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, y: snap(+e.target.value) } : c))}
+                  />
+                </div>
+                <div className="prop-row prop-row-full">
+                  <div className="prop-slider-label"><span>W</span><span className="prop-val">{selectedComp.w}px</span></div>
+                  <input type="range" min={40} max={900} step={16} value={selectedComp.w}
+                    className="prop-slider"
+                    onChange={(e) => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, w: +e.target.value } : c))}
+                  />
+                </div>
+                <div className="prop-row prop-row-full">
+                  <div className="prop-slider-label"><span>H</span><span className="prop-val">{selectedComp.h}px</span></div>
+                  <input type="range" min={24} max={800} step={16} value={selectedComp.h}
+                    className="prop-slider"
+                    onChange={(e) => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, h: +e.target.value } : c))}
+                  />
+                </div>
+                <div className="prop-section-label">Quick align</div>
+                <div className="prop-align-row">
+                  {[16,24,32,48].map(gap => (
+                    <button key={gap} className="prop-gap-btn"
+                      title={`Move right by ${gap}px`}
+                      onClick={() => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, x: c.x + gap } : c))}>
+                      +{gap}
+                    </button>
+                  ))}
+                </div>
+                <div className="prop-align-row" style={{marginTop:4}}>
+                  <button className="prop-align-btn" title="Align left edge to 0"
+                    onClick={() => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, x: 0 } : c))}>⇤ Left</button>
+                  <button className="prop-align-btn" title="Center horizontally"
+                    onClick={() => {
+                      const cw = canvasRef.current?.offsetWidth || 800;
+                      setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, x: snap((cw - c.w) / 2) } : c));
+                    }}>⊕ Center</button>
+                  <button className="prop-align-btn" title="Align top edge to 0"
+                    onClick={() => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, y: 0 } : c))}>⇡ Top</button>
+                </div>
+                {selectedComp.type !== "image" && (
                   <div className="prop-row prop-row-full">
-                    <span>Upload</span>
-                    <label className="img-upload-btn">
-                      📁 Browse File
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{ display: "none" }}
-                        onChange={(e) => {
-                          const file = e.target.files[0];
-                          if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = (ev) =>
-                            setComponents((prev) =>
-                              prev.map((c) =>
-                                c.id === selected
-                                  ? { ...c, props: { ...c.props, src: ev.target.result, alt: file.name } }
-                                  : c
-                              )
-                            );
-                          reader.readAsDataURL(file);
-                        }}
-                      />
-                    </label>
-                  </div>
-                  <div className="prop-row prop-row-full">
-                    <span>URL</span>
+                    <span>Text</span>
                     <input
                       type="text"
-                      value={selectedComp.props.src?.startsWith("data:") ? "" : selectedComp.props.src || ""}
-                      placeholder="https://..."
-                      onChange={(e) => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, props: { ...c.props, src: e.target.value } } : c))}
+                      value={selectedComp.props.text || ""}
+                      onChange={(e) => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, props: { ...c.props, text: e.target.value } } : c))}
                     />
                   </div>
-                  {selectedComp.props.src && (
+                )}
+                {selectedComp.type === "image" && (
+                  <>
                     <div className="prop-row prop-row-full">
-                      <img
-                        src={selectedComp.props.src}
-                        alt="preview"
-                        style={{ width: "100%", borderRadius: 6, maxHeight: 100, objectFit: "cover" }}
+                      <span>Upload</span>
+                      <label className="img-upload-btn">
+                        📁 Browse File
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: "none" }}
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = (ev) =>
+                              setComponents((prev) =>
+                                prev.map((c) =>
+                                  c.id === selected
+                                    ? { ...c, props: { ...c.props, src: ev.target.result, alt: file.name } }
+                                    : c
+                                )
+                              );
+                            reader.readAsDataURL(file);
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <div className="prop-row prop-row-full">
+                      <span>URL</span>
+                      <input
+                        type="text"
+                        value={selectedComp.props.src?.startsWith("data:") ? "" : selectedComp.props.src || ""}
+                        placeholder="https://..."
+                        onChange={(e) => setComponents((prev) => prev.map((c) => c.id === selected ? { ...c, props: { ...c.props, src: e.target.value } } : c))}
                       />
                     </div>
-                  )}
-                </>
-              )}
-              <div className="prop-action-row">
-                <button className="prop-duplicate-btn" onClick={duplicateSelected}>⧉ Duplicate</button>
-                <button className="prop-delete-btn" onClick={deleteSelected}>✕ Delete</button>
+                    {selectedComp.props.src && (
+                      <div className="prop-row prop-row-full">
+                        <img
+                          src={selectedComp.props.src}
+                          alt="preview"
+                          style={{ width: "100%", borderRadius: 6, maxHeight: 100, objectFit: "cover" }}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+                <div className="prop-action-row">
+                  <button className="prop-duplicate-btn" onClick={duplicateSelected}>⧉ Duplicate</button>
+                  <button className="prop-delete-btn" onClick={deleteSelected}>✕ Delete</button>
+                </div>
               </div>
-            </div>
-          )}
-        </aside>
+            )}
+          </aside>
+        )}
 
         {/* Canvas */}
-        <div className="builder-canvas-wrap">
+        <div className={`builder-canvas-wrap ${isPreview ? `preview-mode preview-device-${previewDevice}` : ""}`}>
           <div
             ref={canvasRef}
-            className={`builder-canvas${dragOver ? " drag-over" : ""}`}
-            onDrop={handleCanvasDrop}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onPointerDown={(e) => { if (e.target === canvasRef.current) { setSelected(null); setEditingId(null); } }}
+            className={`builder-canvas ${dragOver ? "drag-over" : ""} ${isPreview ? `preview-frame-${previewDevice}` : ""}`}
+            onDrop={!isPreview ? handleCanvasDrop : undefined}
+            onDragOver={!isPreview ? (e) => { e.preventDefault(); setDragOver(true); } : undefined}
+            onDragLeave={!isPreview ? () => setDragOver(false) : undefined}
+            onPointerDown={!isPreview ? (e) => { if (e.target === canvasRef.current) { setSelected(null); setEditingId(null); } } : undefined}
           >
             {components.length === 0 && imageGrids.length === 0 && (
               <div className="canvas-empty">
                 <svg viewBox="0 0 48 48" fill="none"><rect x="4" y="4" width="40" height="40" rx="8" stroke="#2a2a3e" strokeWidth="2"/><path d="M16 24h16M24 16v16" stroke="#6366f1" strokeWidth="2" strokeLinecap="round"/></svg>
-                <p>Drag components here · or click ⊞ Add Product Grid</p>
+                <p>{isPreview ? "This project has no components yet" : "Drag components here · or click ⊞ Add Product Grid"}</p>
               </div>
             )}
 
             {/* ALL components and grids in one flow column */}
-            <div className="canvas-flow">
+            <div className={`canvas-flow ${isPreview ? "canvas-flow-preview" : ""}`}>
               {/* free-placed components rendered absolutely inside flow */}
-              <div className="canvas-abs-layer">
+              <div className={`canvas-abs-layer ${isPreview ? "canvas-abs-layer-preview" : ""}`}>
                 {components.map((comp) =>
-                  renderComponent(comp, selected === comp.id, setSelected, startDrag, null, startEdit, editingId, handleImageUpload)
+                  renderComponent(comp, selected === comp.id, setSelected, startDrag, null, startEdit, editingId, handleImageUpload, isPreview)
                 )}
-                {guides.map((g, i) =>
+                {!isPreview && guides.map((g, i) =>
                   g.type === "v"
                     ? <div key={i} className="guide-v" style={{ left: g.pos }} />
                     : <div key={i} className="guide-h" style={{ top: g.pos }} />
                 )}
-                {selected && components.filter(c => c.id !== selected).map((o) => {
+                {!isPreview && selected && components.filter(c => c.id !== selected).map((o) => {
                   const s = components.find(c => c.id === selected);
                   if (!s) return null;
                   const gapH = o.x - (s.x + s.w);
@@ -764,16 +884,18 @@ export default function Builder({ token, projectId, onBack }) {
                   const showH = gapH > 0 && gapH < 200 && Math.abs((s.y + s.h/2) - (o.y + o.h/2)) < 80;
                   const showV = gapV > 0 && gapV < 200 && Math.abs((s.x + s.w/2) - (o.x + o.w/2)) < 80;
                   return (
-                    <>
+                    <div key={`guide-group-${o.id}`}>
                       {showH && <div key={`dh-${o.id}`} className="dist-label" style={{ left: s.x + s.w + gapH/2, top: s.y + s.h/2 }}>{gapH}px</div>}
                       {showV && <div key={`dv-${o.id}`} className="dist-label" style={{ left: s.x + s.w/2, top: s.y + s.h + gapV/2 }}>{gapV}px</div>}
-                    </>
+                    </div>
                   );
                 })}
-                <svg className="canvas-grid" aria-hidden="true">
-                  <defs><pattern id="grid" width={GRID} height={GRID} patternUnits="userSpaceOnUse"><circle cx="0.5" cy="0.5" r="0.5" fill="#1e1e2e" /></pattern></defs>
-                  <rect width="100%" height="100%" fill="url(#grid)" />
-                </svg>
+                {!isPreview && (
+                  <svg className="canvas-grid" aria-hidden="true">
+                    <defs><pattern id="grid" width={GRID} height={GRID} patternUnits="userSpaceOnUse"><circle cx="0.5" cy="0.5" r="0.5" fill="#1e1e2e" /></pattern></defs>
+                    <rect width="100%" height="100%" fill="url(#grid)" />
+                  </svg>
+                )}
               </div>
 
               {/* product grids flow below free components */}
@@ -781,14 +903,17 @@ export default function Builder({ token, projectId, onBack }) {
                 <ImageGrid key={g.id} grid={g}
                   onUpdate={(updated) => updateGrid(g.id, updated)}
                   onRemove={() => removeGrid(g.id)}
+                  isPreview={isPreview}
                 />
               ))}
             </div>
           </div>
-          <div className="canvas-status">
-            {components.length} component{components.length !== 1 ? "s" : ""}
-            {selected && ` · ${selectedComp?.type} selected · double-click to edit`}
-          </div>
+          {!isPreview && (
+            <div className="canvas-status">
+              {components.length} component{components.length !== 1 ? "s" : ""}
+              {selected && ` · ${selectedComp?.type} selected · double-click to edit`}
+            </div>
+          )}
         </div>
       </div>
     </div>

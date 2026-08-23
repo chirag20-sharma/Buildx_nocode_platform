@@ -3,18 +3,25 @@ import SignIn from "./SignIn";
 import SignUp from "./SignUp";
 import Dashboard from "./Dashboard";
 import Builder from "./Builder";
+import PublishedPage from "./PublishedPage";
 
 const API = "http://localhost:5000/api/v1";
 
 export default function App() {
+  // Check if current path is a public published website (/p/:id)
+  const pathname = window.location.pathname;
+  const isPublicView = pathname.startsWith("/p/");
+  const publicProjectId = isPublicView ? pathname.replace("/p/", "").split("/")[0] : null;
+
   const storedToken = localStorage.getItem("token") || "";
-  const [page, setPage] = useState(storedToken ? "checking" : "signin");
+  const [page, setPage] = useState(isPublicView ? "published" : storedToken ? "checking" : "signin");
   const [token, setToken] = useState(storedToken);
   const [user, setUser] = useState(null);
   const [editProjectId, setEditProjectId] = useState(null);
   const onBackCallback = useRef(null);
 
   useEffect(() => {
+    if (isPublicView) return; // Do not check auth for public visitors
     if (page !== "checking") return;
     fetch(`${API}/projects`, {
       headers: { Authorization: `Bearer ${storedToken}` },
@@ -60,6 +67,9 @@ export default function App() {
       onBackCallback.current = null;
     }
   };
+
+  if (page === "published")
+    return <PublishedPage projectId={publicProjectId} />;
 
   if (page === "checking")
     return (

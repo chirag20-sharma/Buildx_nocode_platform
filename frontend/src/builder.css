@@ -68,6 +68,12 @@
 .ai-gen-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .builder-topbar-right { display: flex; align-items: center; gap: 8px; min-width: 160px; justify-content: flex-end; }
+.builder-preview-btn {
+  background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3); color: #818cf8; border-radius: 7px;
+  padding: 6px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+  display: flex; align-items: center; gap: 6px;
+}
+.builder-preview-btn:hover { background: rgba(99,102,241,0.22); border-color: #6366f1; color: #a5b4fc; }
 .builder-clear-btn {
   background: none; border: 1px solid #1e1e2e; color: #64748b; border-radius: 7px;
   padding: 6px 12px; font-size: 12.5px; font-weight: 500; cursor: pointer; transition: border-color 0.12s, color 0.12s;
@@ -349,3 +355,260 @@
   transition: background 0.15s, border-color 0.15s; flex-shrink: 0; align-self: start;
 }
 .ig-add:hover { background: rgba(99,102,241,0.14); border-color: #6366f1; }
+
+/* ══════════════════════════════════════════════
+   ── Live Preview Mode & Responsive Frames ──
+   ══════════════════════════════════════════════ */
+
+.builder-topbar-preview {
+  justify-content: space-between;
+  background: #111118;
+  border-bottom: 1px solid #1e1e2e;
+  padding: 0 20px;
+}
+
+.preview-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 220px;
+}
+
+.preview-mode-tag {
+  background: rgba(99, 102, 241, 0.18);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.preview-project-name {
+  color: #e2e8f0;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.preview-device-switcher {
+  display: flex;
+  align-items: center;
+  background: #09090d;
+  border: 1px solid #1e1e2e;
+  border-radius: 9px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.preview-device-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 13px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.preview-device-btn svg {
+  flex-shrink: 0;
+}
+
+.preview-device-btn:hover {
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.preview-device-btn.active {
+  background: #6366f1;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.35);
+}
+
+.preview-topbar-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 220px;
+}
+
+.preview-exit-btn {
+  background: #1e1e2e;
+  border: 1px solid #2a2a3e;
+  color: #e2e8f0;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.preview-exit-btn:hover {
+  background: #2a2a3e;
+  border-color: #6366f1;
+  color: #fff;
+}
+
+/* ── Preview Canvas Wrapper ── */
+.builder-canvas-wrap.preview-mode {
+  background: #08080c;
+  overflow-y: auto;
+  align-items: center;
+}
+
+.builder-canvas.preview-frame-desktop {
+  width: 100%;
+  min-width: 100%;
+  max-width: 100%;
+  min-height: 100%;
+  background: #0f0f13;
+  margin: 0 auto;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.builder-canvas.preview-frame-tablet {
+  width: 768px;
+  min-width: 768px;
+  max-width: 768px;
+  min-height: 900px;
+  background: #0f0f13;
+  margin: 28px auto;
+  border: 2px solid #2a2a3e;
+  border-radius: 20px;
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.25s;
+}
+
+.builder-canvas.preview-frame-mobile {
+  width: 375px;
+  min-width: 375px;
+  max-width: 375px;
+  min-height: 750px;
+  background: #0f0f13;
+  margin: 28px auto;
+  border: 3px solid #2a2a3e;
+  border-radius: 32px;
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.25s;
+}
+
+/* ── Preview Component States ── */
+.preview-mode .canvas-comp {
+  cursor: default !important;
+  user-select: auto !important;
+  border: 1.5px solid transparent !important;
+  box-shadow: none !important;
+}
+
+.preview-mode .canvas-comp:hover {
+  border-color: transparent !important;
+}
+
+.preview-mode .comp-button {
+  cursor: pointer;
+  transition: transform 0.12s, filter 0.12s;
+}
+
+.preview-mode .comp-button:hover {
+  filter: brightness(1.15);
+  transform: scale(1.02);
+}
+
+.preview-mode .comp-button:active {
+  transform: scale(0.98);
+}
+
+.comp-img-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: #161622;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+}
+
+/* ── Preview Product Grid ── */
+.ig-block-preview {
+  background: transparent;
+  border: none;
+  padding: 24px 20px;
+  margin: 0;
+}
+
+.ig-product-card-preview {
+  background: #13131a;
+  border: 1px solid #1e1e2e;
+  border-radius: 12px;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ig-product-card-preview:hover {
+  transform: translateY(-3px);
+  border-color: #6366f1;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+}
+
+.ig-img-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: #09090d;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ig-preview-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ig-preview-price {
+  font-size: 15px;
+  font-weight: 800;
+  color: #34d399;
+  margin: 2px 0 8px;
+}
+
+.ig-btn-preview {
+  background: #6366f1;
+  border: none;
+  color: #ffffff;
+  border-radius: 7px;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.ig-btn-preview:hover {
+  background: #4f46e5;
+  transform: translateY(-1px);
+}
+
+.ig-btn-preview:active {
+  transform: scale(0.98);
+}
