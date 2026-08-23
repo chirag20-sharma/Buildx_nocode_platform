@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import "./dashboard.css";
 
 const API = "http://localhost:5000/api/v1";
@@ -224,6 +224,18 @@ export default function Dashboard({ token, user, onLogout, onOpenBuilder }) {
     if (categoryFilter !== "all" && t.category !== categoryFilter) return false;
     return true;
   });
+
+  const CATEGORY_META = {
+    saas:         { label: 'SaaS',        color: '#6366f1', bg: 'rgba(99,102,241,0.15)'  },
+    blog:         { label: 'Blog',        color: '#ef4444', bg: 'rgba(239,68,68,0.15)'   },
+    ecommerce:    { label: 'E-commerce',  color: '#d97706', bg: 'rgba(217,119,6,0.15)'   },
+    portfolio:    { label: 'Portfolio',   color: '#22d3ee', bg: 'rgba(34,211,238,0.15)'  },
+    restaurant:   { label: 'Restaurant',  color: '#f59e0b', bg: 'rgba(245,158,11,0.15)'  },
+    'landing-page':{ label: 'Landing',     color: '#818cf8', bg: 'rgba(129,140,248,0.15)' },
+    dashboard:    { label: 'Dashboard',   color: '#34d399', bg: 'rgba(52,211,153,0.15)'  },
+    other:        { label: 'Other',       color: '#94a3b8', bg: 'rgba(148,163,184,0.15)' },
+  };
+
 
   const initials = user?.name
     ? user.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
@@ -479,13 +491,13 @@ export default function Dashboard({ token, user, onLogout, onOpenBuilder }) {
               </div>
 
               <div className="dash-filter-pills">
-                {["all", "landing-page", "portfolio", "ecommerce", "blog"].map((cat) => (
+                {["all", "saas", "blog", "ecommerce", "portfolio", "restaurant", "dashboard"].map((cat) => (
                   <button
                     key={cat}
                     className={`dash-pill ${categoryFilter === cat ? "active" : ""}`}
                     onClick={() => setCategoryFilter(cat)}
                   >
-                    {cat === "all" ? "All Templates" : cat.replace("-", " ").replace(/\b\w/g, l => l.toUpperCase())}
+                    {cat === "all" ? "All Templates" : (CATEGORY_META[cat]?.label || cat)}
                   </button>
                 ))}
               </div>
@@ -505,27 +517,52 @@ export default function Dashboard({ token, user, onLogout, onOpenBuilder }) {
               </div>
             ) : (
               <div className="dash-grid">
-                {filteredTemplates.map((t) => (
-                  <div key={t._id} className="dash-card">
-                    <div className="dash-card-preview tpl">
-                      <span>{t.name[0]}</span>
-                    </div>
-                    <div className="dash-card-body">
-                      <div className="dash-card-top">
-                        <h4>{t.name}</h4>
-                        <span className="dash-tag">{t.category}</span>
+                {filteredTemplates.map((t) => {
+                  const meta = CATEGORY_META[t.category] || CATEGORY_META.other;
+                  const gradient = t.theme?.previewGradient || "135deg, #1e1b4b 0%, #312e81 100%";
+                  return (
+                    <div key={t._id} className="dash-card tpl-card">
+                      <div className="dash-card-preview tpl" style={{ background: `linear-gradient(${gradient})` }}>
+                        <div className="tpl-preview-inner">
+                          <div className="tpl-preview-lines">
+                            <div className="tpl-line tpl-line-nav" style={{ background: meta.color }} />
+                            <div className="tpl-line tpl-line-hero" />
+                            <div className="tpl-line tpl-line-hero tpl-line-short" />
+                            <div className="tpl-line-cards">
+                              <div className="tpl-mini-card" />
+                              <div className="tpl-mini-card" />
+                              <div className="tpl-mini-card" />
+                            </div>
+                          </div>
+                        </div>
+                        <span className="tpl-cat-badge" style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.color}40` }}>
+                          {meta.label}
+                        </span>
                       </div>
-                      <p>{t.description}</p>
-                      <div className="dash-card-meta">
-                        <span>{t.components?.length || 0} components</span>
-                        <span>{t.usageCount || 0} uses</span>
+                      <div className="dash-card-body">
+                        <div className="dash-card-top">
+                          <h4>{t.name}</h4>
+                        </div>
+                        <p>{t.description}</p>
+                        {t.features?.length > 0 && (
+                          <ul className="tpl-features">
+                            {t.features.slice(0, 4).map((f, i) => (
+                              <li key={i}>{f}</li>
+                            ))}
+                            {t.features.length > 4 && <li className="tpl-features-more">+{t.features.length - 4} more</li>}
+                          </ul>
+                        )}
+                        <div className="dash-card-meta">
+                          <span>{t.components?.length || 0} components</span>
+                          <span>{t.usageCount || 0} uses</span>
+                        </div>
+                        <button className="dash-use-btn" style={{ borderColor: `${meta.color}50`, color: meta.color }} onClick={() => useTemplate(t._id, t.name)}>
+                          Use this template
+                        </button>
                       </div>
-                      <button className="dash-use-btn" onClick={() => useTemplate(t._id, t.name)}>
-                        Use template
-                      </button>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>
