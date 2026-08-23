@@ -1,0 +1,298 @@
+/* ══════════════════════════════════════════════════════════
+   ── BuildX Published Website Global Styles ──
+   ══════════════════════════════════════════════════════════ */
+
+.pub-root {
+  min-height: 100vh;
+  background: #ffffff;
+  color: #0f172a;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ── Loading and 404 Screens ── */
+.pub-status-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #0f0f13;
+  color: #f1f5f9;
+  text-align: center;
+  padding: 32px;
+  gap: 16px;
+}
+
+.pub-status-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  margin-bottom: 8px;
+}
+
+.pub-status-screen h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.pub-status-screen p {
+  font-size: 14.5px;
+  color: #94a3b8;
+  max-width: 420px;
+  line-height: 1.6;
+}
+
+.pub-home-btn {
+  margin-top: 12px;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.pub-home-btn:hover {
+  background: #4f46e5;
+}
+
+/* ── Live Content Container ── */
+.pub-container {
+  width: 100%;
+  position: relative;
+}
+
+/* ── Free-positioned Canvas Layer ── */
+.pub-canvas-layer {
+  position: relative;
+  width: 100%;
+  min-height: 400px;
+}
+
+.pub-comp {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.pub-comp-navbar {
+  background: #1e1b4b;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border-radius: 4px;
+  padding: 0 20px;
+}
+
+.pub-comp-hero {
+  background: transparent;
+  color: #0f172a;
+  font-size: 32px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.pub-comp-header {
+  background: transparent;
+  color: #0f172a;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.pub-comp-text {
+  background: transparent;
+  color: #334155;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.pub-comp-button {
+  background: #6366f1;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.pub-comp-button:hover {
+  background: #4f46e5;
+  transform: translateY(-1px);
+}
+
+.pub-comp-button:active {
+  transform: scale(0.98);
+}
+
+.pub-comp-image {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.pub-comp-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pub-comp-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+}
+
+.pub-comp-container {
+  background: transparent;
+}
+
+/* ── Live Product Grid ── */
+.pub-product-grid-section {
+  max-width: 1120px;
+  margin: 40px auto 60px;
+  padding: 0 24px;
+}
+
+.pub-product-grid {
+  display: grid;
+  gap: 24px;
+}
+
+.pub-product-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+.pub-product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.08);
+}
+
+.pub-product-img {
+  width: 100%;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.pub-product-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pub-product-info {
+  padding: 18px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.pub-product-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.pub-product-price {
+  font-size: 17px;
+  font-weight: 800;
+  color: #059669;
+  margin-bottom: 8px;
+}
+
+.pub-product-btn {
+  background: #6366f1;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.pub-product-btn:hover {
+  background: #4f46e5;
+}
+
+.pub-product-btn:active {
+  transform: scale(0.98);
+}
+
+/* ── "Built with BuildX" Floating Badge ── */
+.pub-badge {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #0f0f13;
+  color: #f1f5f9;
+  border: 1px solid #1e1e2e;
+  border-radius: 30px;
+  padding: 7px 14px 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s, border-color 0.15s;
+  z-index: 9999;
+}
+
+.pub-badge:hover {
+  transform: translateY(-2px);
+  border-color: #6366f1;
+}
+
+.pub-badge-logo {
+  width: 20px;
+  height: 20px;
+  background: #6366f1;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+}
+
