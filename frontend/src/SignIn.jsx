@@ -3,6 +3,13 @@ import "./auth.css";
 
 const API = "http://localhost:5000/api/v1";
 
+const FEATURES = [
+  { icon: "✦", text: "Visual drag-and-drop canvas" },
+  { icon: "⚡", text: "AI-powered page generation" },
+  { icon: "🎨", text: "50+ professional templates" },
+  { icon: "🚀", text: "One-click publish & deploy" },
+];
+
 export default function SignIn({ onAuth, goToSignUp }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,7 +50,15 @@ export default function SignIn({ onAuth, goToSignUp }) {
         </div>
         <div className="auth-tagline">
           <h1>Build websites<br />without code.</h1>
-          <p>Drag, drop, and launch — no developer needed.</p>
+          <p>Design visually, connect a backend, and publish — all in one place.</p>
+        </div>
+        <div className="auth-features">
+          {FEATURES.map((f) => (
+            <div key={f.text} className="auth-feature-item">
+              <div className="auth-feature-icon">{f.icon}</div>
+              <span>{f.text}</span>
+            </div>
+          ))}
         </div>
         <div className="auth-dots">
           <span /><span /><span />
@@ -54,7 +69,7 @@ export default function SignIn({ onAuth, goToSignUp }) {
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="auth-form-header">
             <h2>Welcome back</h2>
-            <p>Sign in to your account</p>
+            <p>Sign in to continue building</p>
           </div>
 
           {error && <div className="auth-error">{error}</div>}
@@ -88,7 +103,7 @@ export default function SignIn({ onAuth, goToSignUp }) {
 
           <p className="auth-switch">
             Don't have an account?{" "}
-            <button type="button" onClick={goToSignUp}>Create one</button>
+            <button type="button" onClick={goToSignUp}>Create one free</button>
           </p>
         </form>
       </div>

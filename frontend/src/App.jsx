@@ -4,6 +4,9 @@ import SignUp from "./SignUp";
 import Dashboard from "./Dashboard";
 import Builder from "./Builder";
 import PublishedPage from "./PublishedPage";
+import LandingPage from "./LandingPage";
+import Onboarding from "./Onboarding";
+import TemplatePreviewPage from "./TemplatePreviewPage";
 
 const API = "http://localhost:5000/api/v1";
 
@@ -14,7 +17,7 @@ export default function App() {
   const publicProjectId = isPublicView ? pathname.replace("/p/", "").split("/")[0] : null;
 
   const storedToken = localStorage.getItem("token") || "";
-  const [page, setPage] = useState(isPublicView ? "published" : storedToken ? "checking" : "signin");
+  const [page, setPage] = useState(isPublicView ? "published" : storedToken ? "checking" : "landing");
   const [token, setToken] = useState(storedToken);
   const [user, setUser] = useState(null);
   const [editProjectId, setEditProjectId] = useState(null);
@@ -39,10 +42,10 @@ export default function App() {
       .catch(() => setPage("dashboard"));
   }, []);
 
-  const handleAuth = (t, u) => {
+  const handleAuth = (t, u, isNewSignup = false) => {
     setToken(t);
     setUser(u);
-    setPage("dashboard");
+    setPage(isNewSignup ? "onboarding" : "dashboard");
   };
 
   const handleLogout = () => {
@@ -79,11 +82,17 @@ export default function App() {
       </div>
     );
 
+  if (page === "landing")
+    return <LandingPage onGetStarted={() => setPage("signup")} onSignIn={() => setPage("signin")} />;
+
   if (page === "signin")
     return <SignIn onAuth={handleAuth} goToSignUp={() => setPage("signup")} />;
 
   if (page === "signup")
     return <SignUp onAuth={handleAuth} goToSignIn={() => setPage("signin")} />;
+
+  if (page === "onboarding")
+    return <Onboarding user={user} onComplete={() => setPage("dashboard")} />;
 
   if (page === "builder")
     return <Builder token={token} projectId={editProjectId} onBack={handleBuilderBack} />;

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useReducer } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import "./builder.css";
 
 const API = "http://localhost:5000/api/v1";
@@ -43,9 +43,42 @@ const COMPONENT_GROUPS = [
       { type: "text",       label: "Text",        icon: "T",  defaultW: 300, defaultH: 40,  props: { text: "Your text here", fontSize: 16, color: "#1a1a1a" } },
       { type: "heading",    label: "Heading",     icon: "H",  defaultW: 400, defaultH: 56,  props: { text: "Section Heading", fontSize: 32, fontWeight: "700", color: "#0f172a" } },
       { type: "button",     label: "Button",      icon: "▶",  defaultW: 160, defaultH: 44,  props: { text: "Click me", bg: "#6366f1", color: "#ffffff", radius: 8 } },
-      { type: "image",      label: "Image",       icon: "🖼", defaultW: 320, defaultH: 220, props: { src: "", alt: "Image", fit: "cover" } },
       { type: "divider",    label: "Divider",     icon: "─",  defaultW: 400, defaultH: 2,   props: { color: "#e2e8f0" } },
       { type: "spacer",     label: "Spacer",      icon: "↕",  defaultW: 400, defaultH: 40,  props: {} },
+    ]
+  },
+  {
+    group: "Media",
+    items: [
+      { type: "image",      label: "Image",       icon: "🖼", defaultW: 320, defaultH: 220, props: { src: "", alt: "Image", fit: "cover" } },
+      {
+        type: "imagegrid",
+        label: "Image Grid",
+        icon: "▦",
+        defaultW: 660,
+        defaultH: 440,
+        props: {
+          cols: 3,
+          gap: 8,
+          aspectRatio: "1/1",
+          fit: "cover",
+          radius: 8,
+          hoverEffect: "zoom",
+          lightbox: false,
+          desktopCols: 3,
+          tabletCols: 2,
+          mobileCols: 1,
+          images: [
+            { src: "", alt: "Photo 1" },
+            { src: "", alt: "Photo 2" },
+            { src: "", alt: "Photo 3" },
+            { src: "", alt: "Photo 4" },
+            { src: "", alt: "Photo 5" },
+            { src: "", alt: "Photo 6" },
+          ],
+        },
+      },
+      { type: "video",      label: "Video",       icon: "▶",  defaultW: 480, defaultH: 270, props: { src: "", poster: "", controls: true } },
     ]
   },
   {
@@ -129,6 +162,42 @@ function renderNodeContent(node) {
       return p.src
         ? <img src={p.src} alt={p.alt || ""} style={{ width: "100%", height: "100%", objectFit: p.fit || "cover", borderRadius: p.radius || 0, display: "block" }} />
         : <div className="node-img-empty"><svg viewBox="0 0 24 24" fill="none" width="28" height="28"><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg><span>Image</span></div>;
+    case "imagegrid": {
+      const images = p.images || [];
+      const cols = p.cols || 3;
+      const gap = p.gap ?? 8;
+      const radius = p.radius ?? 8;
+      const fit = p.fit || "cover";
+      const aspectRatio = p.aspectRatio || "1/1";
+      return (
+        <div className="node-imagegrid" style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap, width: "100%", height: "100%", padding: 4 }}>
+          {images.map((img, i) => (
+            <div key={i} className="node-imagegrid-item" style={{ borderRadius: radius, overflow: "hidden", aspectRatio, position: "relative" }}>
+              {img.src
+                ? <img src={img.src} alt={img.alt || `Photo ${i+1}`} style={{ width: "100%", height: "100%", objectFit: fit, display: "block" }} />
+                : <div className="node-imagegrid-empty-cell">
+                    <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                    <span>{i + 1}</span>
+                  </div>
+              }
+            </div>
+          ))}
+          {images.length === 0 && (
+            <div className="node-imagegrid-placeholder" style={{ gridColumn: `1 / span ${cols}` }}>
+              <svg viewBox="0 0 24 24" fill="none" width="32" height="32"><rect x="2" y="2" width="9" height="9" rx="2" stroke="currentColor" strokeWidth="1.5"/><rect x="13" y="2" width="9" height="9" rx="2" stroke="currentColor" strokeWidth="1.5"/><rect x="2" y="13" width="9" height="9" rx="2" stroke="currentColor" strokeWidth="1.5"/><rect x="13" y="13" width="9" height="9" rx="2" stroke="currentColor" strokeWidth="1.5"/></svg>
+              <span>Image Grid</span>
+            </div>
+          )}
+        </div>
+      );
+    }
+    case "video":
+      return (
+        <div className="node-img-empty" style={{ background: "#0a0a0f" }}>
+          <svg viewBox="0 0 24 24" fill="none" width="28" height="28"><rect x="2" y="4" width="20" height="16" rx="3" stroke="currentColor" strokeWidth="1.5"/><path d="M10 9l5 3-5 3V9z" fill="currentColor"/></svg>
+          <span>{p.src ? "Video" : "Video"}</span>
+        </div>
+      );
     case "navbar":
       return <div style={{ background: p.bg || "#0f172a", color: p.color || "#f1f5f9", width: "100%", height: "100%", display: "flex", alignItems: "center", padding: "0 20px", gap: 24, fontSize: 14, fontWeight: 600 }}><span style={{ fontWeight: 800, fontSize: 16 }}>{p.brand || "Brand"}</span><span style={{ opacity: 0.6, fontSize: 12 }}>{p.links || "Home · About · Contact"}</span></div>;
     case "footer":
@@ -267,6 +336,67 @@ function PropertiesPanel({ node, onChange, onDelete, onDuplicate }) {
               }} />
             </label>
           </PropRow>
+        </>;
+      case "imagegrid": {
+        const images = p.images || [];
+        const setImage = (idx, key, val) => {
+          const next = images.map((img, i) => i === idx ? { ...img, [key]: val } : img);
+          set("images", next);
+        };
+        const addImage = () => set("images", [...images, { src: "", alt: `Photo ${images.length + 1}` }]);
+        const removeImage = (idx) => set("images", images.filter((_, i) => i !== idx));
+        return <>
+          <div className="bx-props-section-title" style={{ marginTop: 4 }}>Layout</div>
+          <PropRow label="Columns"><NumberInput k="cols" min={1} max={6} /></PropRow>
+          <PropRow label="Gap"><NumberInput k="gap" min={0} max={40} /></PropRow>
+          <PropRow label="Aspect">
+            <select className="bx-prop-select" value={p.aspectRatio || "1/1"} onChange={e => set("aspectRatio", e.target.value)}>
+              {["1/1","4/3","3/2","16/9","2/3","3/4"].map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </PropRow>
+          <PropRow label="Fit">
+            <select className="bx-prop-select" value={p.fit || "cover"} onChange={e => set("fit", e.target.value)}>
+              {["cover","contain","fill"].map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </PropRow>
+          <PropRow label="Radius"><NumberInput k="radius" min={0} max={40} /></PropRow>
+          <div className="bx-props-section-title" style={{ marginTop: 8 }}>Hover</div>
+          <PropRow label="Effect">
+            <select className="bx-prop-select" value={p.hoverEffect || "none"} onChange={e => set("hoverEffect", e.target.value)}>
+              {["none","zoom","overlay","both"].map(h => <option key={h} value={h}>{h}</option>)}
+            </select>
+          </PropRow>
+          <div className="bx-props-section-title" style={{ marginTop: 8 }}>Responsive</div>
+          <PropRow label="Desktop"><NumberInput k="desktopCols" min={1} max={6} /></PropRow>
+          <PropRow label="Tablet"><NumberInput k="tabletCols" min={1} max={4} /></PropRow>
+          <PropRow label="Mobile"><NumberInput k="mobileCols" min={1} max={2} /></PropRow>
+          <div className="bx-props-section-title" style={{ marginTop: 8 }}>Images ({images.length})</div>
+          <div className="bx-imagegrid-images-list">
+            {images.map((img, idx) => (
+              <div key={idx} className="bx-imagegrid-img-row">
+                <span className="bx-imagegrid-img-num">{idx + 1}</span>
+                <input className="bx-prop-input" style={{ flex: 1, fontSize: 11 }} value={img.src || ""} placeholder="URL or upload" onChange={e => setImage(idx, "src", e.target.value)} />
+                <label className="bx-imagegrid-upload-mini" title="Upload">
+                  ↑
+                  <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = ev => setImage(idx, "src", ev.target.result);
+                    reader.readAsDataURL(file);
+                  }} />
+                </label>
+                <button className="bx-imagegrid-remove-btn" onClick={() => removeImage(idx)} title="Remove">✕</button>
+              </div>
+            ))}
+          </div>
+          <button className="bx-prop-upload-btn" style={{ marginTop: 6 }} onClick={addImage}>+ Add Image</button>
+        </>;
+      }
+      case "video":
+        return <>
+          <PropRow label="URL"><TextInput k="src" placeholder="https://..." /></PropRow>
+          <PropRow label="Poster"><TextInput k="poster" placeholder="Thumbnail URL" /></PropRow>
         </>;
       case "navbar":
         return <>
@@ -410,8 +540,6 @@ export default function Builder({ token, projectId, onBack }) {
   const [multiSelected, setMultiSelected] = useState([]); // array of ids
   const [guides, setGuides] = useState([]);
   const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
   const [isPreview, setIsPreview] = useState(false);
   const [previewDevice, setPreviewDevice] = useState("desktop");
   const [leftTab, setLeftTab] = useState("components"); // "components" | "layers"
@@ -428,7 +556,6 @@ export default function Builder({ token, projectId, onBack }) {
   const canvasRef = useRef(null);
   const wrapRef = useRef(null);
   const dragState = useRef(null);
-  const panState = useRef(null);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -652,7 +779,7 @@ export default function Builder({ token, projectId, onBack }) {
     if (!token) { showToast("Not logged in", "error"); return; }
     setSaving(true);
     try {
-      const ALLOWED = ["button","input","textarea","text","heading","image","container","section","columns","formblock","navbar","footer","hero","card","badge","alert","tabs","productcard","pricingcard","testimonial","blogcard","statcard","divider","spacer","select","checkbox"];
+      const ALLOWED = ["button","input","textarea","text","heading","image","imagegrid","video","container","section","columns","formblock","navbar","footer","hero","card","badge","alert","tabs","productcard","pricingcard","testimonial","blogcard","statcard","divider","spacer","select","checkbox"];
       const comps = nodes.map(n => ({
         id: n.id,
         type: ALLOWED.includes(n.type) ? n.type : "container",
@@ -783,6 +910,7 @@ export default function Builder({ token, projectId, onBack }) {
                     <div className="bx-comp-group-label">{group.group}</div>
                     {group.items.map(item => (
                       <div key={item.type} className="bx-comp-item"
+                        data-imagegrid={item.type === "imagegrid" ? "true" : undefined}
                         draggable
                         onDragStart={e => { e.dataTransfer.setData("compDef", JSON.stringify(item)); e.dataTransfer.effectAllowed = "copy"; }}>
                         <span className="bx-comp-icon">{item.icon}</span>

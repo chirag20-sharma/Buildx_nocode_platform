@@ -3,6 +3,13 @@ import "./auth.css";
 
 const API = "http://localhost:5000/api/v1";
 
+const FEATURES = [
+  { icon: "✦", text: "Visual drag-and-drop canvas" },
+  { icon: "⚡", text: "AI-powered page generation" },
+  { icon: "🎨", text: "50+ professional templates" },
+  { icon: "🚀", text: "One-click publish & deploy" },
+];
+
 export default function SignUp({ onAuth, goToSignIn }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -24,7 +31,7 @@ export default function SignUp({ onAuth, goToSignIn }) {
       const data = await res.json();
       if (data.success) {
         localStorage.setItem("token", data.payload.token);
-        onAuth(data.payload.token, data.payload.user);
+        onAuth(data.payload.token, data.payload.user, true);
       } else {
         setError(data.message || "Signup failed");
       }
@@ -46,6 +53,14 @@ export default function SignUp({ onAuth, goToSignIn }) {
           <h1>Start building<br />for free.</h1>
           <p>Join thousands of creators shipping faster with BuildX.</p>
         </div>
+        <div className="auth-features">
+          {FEATURES.map((f) => (
+            <div key={f.text} className="auth-feature-item">
+              <div className="auth-feature-icon">{f.icon}</div>
+              <span>{f.text}</span>
+            </div>
+          ))}
+        </div>
         <div className="auth-dots">
           <span /><span /><span />
         </div>
@@ -55,7 +70,7 @@ export default function SignUp({ onAuth, goToSignIn }) {
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="auth-form-header">
             <h2>Create account</h2>
-            <p>Get started — it's free</p>
+            <p>Get started — it's free, no credit card needed</p>
           </div>
 
           {error && <div className="auth-error">{error}</div>}
