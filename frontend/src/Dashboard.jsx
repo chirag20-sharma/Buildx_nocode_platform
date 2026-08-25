@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import "./dashboard.css";
 
 const API = "http://localhost:5000/api/v1";
@@ -180,11 +180,20 @@ export default function Dashboard({ token, user, onLogout, onOpenBuilder }) {
     }
   };
 
-  // ── Toggle Publish ──
-  const togglePublish = async (projectId) => {
+  const getLiveUrl = (p) => {
+    return p.publishedUrl || (p.slug ? `http://localhost:5000/sites/${p.slug}` : `http://localhost:5000/sites/${p._id}`);
+  };
+
+  // ── Toggle Publish / Real Deploy ──
+  const togglePublish = async (project) => {
     try {
-      const res = await fetch(`${API}/projects/${projectId}/publish`, {
-        method: "PATCH",
+      const isCurrentlyPublished = project.isPublished;
+      const endpoint = isCurrentlyPublished
+        ? `${API}/projects/${project._id}/unpublish`
+        : `${API}/projects/${project._id}/publish`;
+
+      const res = await fetch(endpoint, {
+        method: "POST",
         headers: authHeaders,
         credentials: "include",
       });
@@ -236,7 +245,6 @@ export default function Dashboard({ token, user, onLogout, onOpenBuilder }) {
     other:        { label: 'Other',       color: '#94a3b8', bg: 'rgba(148,163,184,0.15)' },
   };
 
-
   const initials = user?.name
     ? user.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
     : "U";
@@ -268,29 +276,34 @@ export default function Dashboard({ token, user, onLogout, onOpenBuilder }) {
               <span className="dash-user-email">{user?.email || ""}</span>
             </div>
           </div>
-          <button className="dash-logout" onClick={onLogout} title="Sign out">
-            <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h7a1 1 0 000-2H4V5h6a1 1 0 000-2H3zm11.293 4.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L15.586 11H9a1 1 0 010-2h6.586l-1.293-1.293a1 1 0 010-1.414z" clipRule="evenodd"/></svg>
+          <button className="dash-logout-btn" onClick={onLogout} title="Sign out">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd"/></svg>
+            Sign out
           </button>
         </div>
       </aside>
 
       <main className="dash-main">
-        {toast && <div className={`dash-toast ${toast.type}`}>{toast.msg}</div>}
+        {toast && (
+          <div className={`dash-toast ${toast.type}`}>
+            <span>{toast.msg}</span>
+          </div>
+        )}
 
         {tab === "projects" && (
           <>
             <div className="dash-header">
               <div>
-                <h1>Projects</h1>
-                <p>{projects.length} project{projects.length !== 1 ? "s" : ""}</p>
+                <h1>My Websites</h1>
+                <p>Manage, edit, and publish your websites</p>
               </div>
-              <button className="dash-cta" onClick={openNew}>
+              <button className="dash-create-btn" onClick={openNew}>
                 <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd"/></svg>
-                New project
+                New Website
               </button>
             </div>
 
-            {/* Toolbar: Search + Status Filter */}
+            {/* Filter & Search Bar */}
             <div className="dash-toolbar">
               <div className="dash-search-box">
                 <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
@@ -348,113 +361,115 @@ export default function Dashboard({ token, user, onLogout, onOpenBuilder }) {
               </div>
             ) : (
               <div className="dash-grid">
-                {filteredProjects.map((p) => (
-                  <div key={p._id} className="dash-card" onClick={() => openEdit(p._id)}>
-                    <div className="dash-card-preview">
-                      <span>{p.name[0]}</span>
-                      {/* 3-dots action button */}
-                      <button
-                        className="dash-card-menu-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveMenuId(activeMenuId === p._id ? null : p._id);
-                        }}
-                        title="Project actions"
-                      >
-                        <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-                          <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                        </svg>
-                      </button>
+                {filteredProjects.map((p) => {
+                  const liveUrl = getLiveUrl(p);
+                  return (
+                    <div key={p._id} className="dash-card" onClick={() => openEdit(p._id)}>
+                      <div className="dash-card-preview">
+                        <span>{p.name[0]}</span>
+                        {/* 3-dots action button */}
+                        <button
+                          className="dash-card-menu-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenuId(activeMenuId === p._id ? null : p._id);
+                          }}
+                          title="Project actions"
+                        >
+                          <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                          </svg>
+                        </button>
 
-                      {/* Dropdown Menu */}
-                      {activeMenuId === p._id && (
-                        <div className="dash-dropdown-menu" onClick={(e) => e.stopPropagation()}>
-                          <button onClick={() => { setActiveMenuId(null); openEdit(p._id); }}>
-                            <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
-                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                            </svg>
-                            Edit Canvas
-                          </button>
-                          <button onClick={() => { setActiveMenuId(null); setRenameModal({ isOpen: true, projectId: p._id, name: p.name }); }}>
-                            <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
-                              <path fillRule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/>
-                            </svg>
-                            Rename
-                          </button>
-                          <button onClick={() => { setActiveMenuId(null); duplicateProject(p); }}>
-                            <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
-                              <path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z"/>
-                              <path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2V5h8a2 2 0 00-2-2H5z"/>
-                            </svg>
-                            Duplicate
-                          </button>
-                          {p.isPublished && (
-                            <>
-                              <button onClick={() => { setActiveMenuId(null); window.open(`/p/${p._id}`, '_blank'); }}>
-                                <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
-                                  <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
-                                  <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
-                                </svg>
-                                View Live Site
-                              </button>
-                              <button onClick={() => {
-                                setActiveMenuId(null);
-                                const liveUrl = `${window.location.origin}/p/${p._id}`;
-                                navigator.clipboard.writeText(liveUrl);
-                                showToast("Live link copied to clipboard!");
-                              }}>
-                                <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
-                                  <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd"/>
-                                </svg>
-                                Copy Live Link
-                              </button>
-                            </>
-                          )}
-                          <button onClick={() => { setActiveMenuId(null); togglePublish(p._id); }}>
-                            <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-.2c0-1.4-1.4-2.8-2.8-2.8H7a1 1 0 01-1-1v-1a2 2 0 00-1.668-1.973z" clipRule="evenodd"/>
-                            </svg>
-                            {p.isPublished ? "Unpublish" : "Publish Site"}
-                          </button>
-                          <button className="delete-item" onClick={() => { setActiveMenuId(null); setDeleteModal({ isOpen: true, projectId: p._id, name: p.name }); }}>
-                            <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
-                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"/>
-                            </svg>
-                            Delete
+                        {/* Dropdown Menu */}
+                        {activeMenuId === p._id && (
+                          <div className="dash-dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                            <button onClick={() => { setActiveMenuId(null); openEdit(p._id); }}>
+                              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                              </svg>
+                              Edit Canvas
+                            </button>
+                            <button onClick={() => { setActiveMenuId(null); setRenameModal({ isOpen: true, projectId: p._id, name: p.name }); }}>
+                              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                                <path fillRule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/>
+                              </svg>
+                              Rename
+                            </button>
+                            <button onClick={() => { setActiveMenuId(null); duplicateProject(p); }}>
+                              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                                <path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z"/>
+                                <path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2V5h8a2 2 0 00-2-2H5z"/>
+                              </svg>
+                              Duplicate
+                            </button>
+                            {p.isPublished && (
+                              <>
+                                <button onClick={() => { setActiveMenuId(null); window.open(liveUrl, '_blank'); }}>
+                                  <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                                    <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
+                                    <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
+                                  </svg>
+                                  View Live Site
+                                </button>
+                                <button onClick={() => {
+                                  setActiveMenuId(null);
+                                  navigator.clipboard.writeText(liveUrl);
+                                  showToast("Live link copied to clipboard!");
+                                }}>
+                                  <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                                    <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd"/>
+                                  </svg>
+                                  Copy Live Link
+                                </button>
+                              </>
+                            )}
+                            <button onClick={() => { setActiveMenuId(null); togglePublish(p); }}>
+                              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-.2c0-1.4-1.4-2.8-2.8-2.8H7a1 1 0 01-1-1v-1a2 2 0 00-1.668-1.973z" clipRule="evenodd"/>
+                              </svg>
+                              {p.isPublished ? "Unpublish" : "Publish Site"}
+                            </button>
+                            <button className="delete-item" onClick={() => { setActiveMenuId(null); setDeleteModal({ isOpen: true, projectId: p._id, name: p.name }); }}>
+                              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"/>
+                              </svg>
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="dash-card-body">
+                        <div className="dash-card-top">
+                          <h4>{p.name}</h4>
+                          <span
+                            className={`dash-badge ${p.isPublished ? "pub pub-clickable" : "draft"}`}
+                            onClick={(e) => {
+                              if (p.isPublished) {
+                                e.stopPropagation();
+                                window.open(liveUrl, '_blank');
+                              }
+                            }}
+                            title={p.isPublished ? "Click to open live published site" : "Draft"}
+                          >
+                            {p.isPublished ? "Published ↗" : "Draft"}
+                          </span>
+                        </div>
+                        <p>{p.description || "No description provided"}</p>
+                        <div className="dash-card-meta">
+                          <span>{p.components?.length || 0} components</span>
+                          {p.updatedAt && <span className="dash-card-date">{formatDate(p.updatedAt)}</span>}
+                        </div>
+                        <div className="dash-card-actions">
+                          <button className="dash-edit-btn" onClick={(e) => { e.stopPropagation(); openEdit(p._id); }}>
+                            Open Builder
                           </button>
                         </div>
-                      )}
-                    </div>
-
-                    <div className="dash-card-body">
-                      <div className="dash-card-top">
-                        <h4>{p.name}</h4>
-                        <span
-                          className={`dash-badge ${p.isPublished ? "pub pub-clickable" : "draft"}`}
-                          onClick={(e) => {
-                            if (p.isPublished) {
-                              e.stopPropagation();
-                              window.open(`/p/${p._id}`, '_blank');
-                            }
-                          }}
-                          title={p.isPublished ? "Click to open live published site" : "Draft"}
-                        >
-                          {p.isPublished ? "Published ↗" : "Draft"}
-                        </span>
-                      </div>
-                      <p>{p.description || "No description provided"}</p>
-                      <div className="dash-card-meta">
-                        <span>{p.components?.length || 0} components</span>
-                        {p.updatedAt && <span className="dash-card-date">{formatDate(p.updatedAt)}</span>}
-                      </div>
-                      <div className="dash-card-actions">
-                        <button className="dash-edit-btn" onClick={(e) => { e.stopPropagation(); openEdit(p._id); }}>
-                          Open Builder
-                        </button>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <div className="dash-card dash-card-new" onClick={openNew}>
                   <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#6366f1" strokeWidth="2" strokeLinecap="round"/></svg>
                   <span>New project</span>

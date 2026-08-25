@@ -124,6 +124,7 @@
   color: var(--bx-text-secondary); letter-spacing: 0.1px;
 }
 .field-group input {
+  width: 100%;
   background: var(--bx-bg-elevated);
   border: 1px solid var(--bx-border-mid);
   border-radius: var(--r-md);
@@ -140,6 +141,39 @@
   background: var(--bx-bg-overlay);
 }
 
+.password-with-toggle {
+  display: flex; align-items: center;
+  background: var(--bx-bg-elevated);
+  border: 1px solid var(--bx-border-mid);
+  border-radius: var(--r-md);
+  transition: border-color var(--t-base), box-shadow var(--t-base), background var(--t-base);
+  overflow: hidden;
+}
+.password-with-toggle:focus-within {
+  border-color: var(--bx-brand);
+  box-shadow: var(--bx-brand-glow);
+  background: var(--bx-bg-overlay);
+}
+.password-with-toggle input {
+  border: none; background: transparent; flex: 1; outline: none;
+  border-radius: 0;
+}
+.password-toggle-btn {
+  background: transparent; border: none; color: var(--bx-brand-text);
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  padding: 0 12px; min-width: 52px; height: 100%;
+}
+
+.auth-row {
+  display: flex; justify-content: flex-end; margin-top: -8px;
+}
+.auth-link-btn {
+  background: none; border: none; color: var(--bx-brand-text);
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+  padding: 0;
+}
+.auth-link-btn:hover { text-decoration: underline; }
+
 /* ── Submit button ── */
 .auth-btn {
   background: var(--bx-brand); color: #fff; border: none;
@@ -155,6 +189,16 @@
 }
 .auth-btn:active:not(:disabled) { transform: scale(0.99); }
 .auth-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.auth-google-note {
+  background: rgba(99,102,241,0.08);
+  border: 1px solid var(--bx-brand-border);
+  color: var(--bx-text-secondary);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
 
 /* ── Switch link ── */
 .auth-switch {

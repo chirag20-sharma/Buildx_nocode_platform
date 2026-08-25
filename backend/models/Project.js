@@ -35,6 +35,7 @@ const ProjectSchema = new mongoose.Schema({
     layout: { type: String, enum: ["fixed", "responsive"], default: "responsive" }
   },
   isPublished:  { type: Boolean, default: false },
+  slug:         { type: String, trim: true, lowercase: true, default: null },
   publishedUrl: { type: String, default: null }
 }, { timestamps: true });
 

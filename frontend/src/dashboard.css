@@ -94,6 +94,40 @@
 .dash-logout svg { width: 15px; height: 15px; }
 .dash-logout:hover { color: var(--bx-error); background: var(--bx-error-bg); }
 
+.dash-logout-btn,
+.dash-create-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--bx-brand-border);
+  background: var(--bx-brand-light);
+  color: var(--bx-brand-text);
+  border-radius: var(--r-md);
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--t-base), border-color var(--t-base), transform var(--t-fast), box-shadow var(--t-base);
+}
+.dash-logout-btn:hover,
+.dash-create-btn:hover {
+  background: var(--bx-brand-mid);
+  border-color: var(--bx-brand);
+  box-shadow: var(--shadow-brand);
+}
+.dash-logout-btn {
+  background: rgba(239,68,68,0.08);
+  border-color: rgba(239,68,68,0.2);
+  color: #fca5a5;
+}
+.dash-logout-btn:hover {
+  background: rgba(239,68,68,0.15);
+  border-color: rgba(239,68,68,0.35);
+}
+.dash-logout-btn svg,
+.dash-create-btn svg { width: 15px; height: 15px; }
+
 /* ══════════════════════════════════════
    MAIN CONTENT
 ══════════════════════════════════════ */
@@ -125,7 +159,8 @@
 }
 .dash-header p { font-size: 13px; color: var(--bx-text-muted); }
 
-.dash-cta {
+.dash-cta,
+.dash-create-btn {
   display: flex; align-items: center; gap: 7px;
   background: var(--bx-brand); color: #fff; border: none;
   border-radius: var(--r-md); padding: 9px 16px;
@@ -133,8 +168,10 @@
   transition: background var(--t-base), box-shadow var(--t-base);
   white-space: nowrap;
 }
-.dash-cta svg { width: 15px; height: 15px; }
-.dash-cta:hover { background: var(--bx-brand-hover); box-shadow: var(--shadow-brand); }
+.dash-cta svg,
+.dash-create-btn svg { width: 15px; height: 15px; }
+.dash-cta:hover,
+.dash-create-btn:hover { background: var(--bx-brand-hover); box-shadow: var(--shadow-brand); }
 
 /* ── Toolbar ── */
 .dash-toolbar {
