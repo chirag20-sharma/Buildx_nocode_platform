@@ -150,6 +150,24 @@ function getSnapGuides(x, y, w, h, others, step = GRID) {
 }
 
 // ─── Component Renderer ───────────────────────────────────────────────────
+function normalizeList(value, fallback = []) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === "string") return item.trim();
+        if (item && typeof item === "object") {
+          const label = item.label ?? item.text ?? item.name ?? item.title;
+          if (label) return String(label).trim();
+          if (item.url) return String(item.url).trim();
+        }
+        return "";
+      })
+      .filter(Boolean);
+  }
+  if (typeof value === "string") return value.split(",").map(v => v.trim()).filter(Boolean);
+  return Array.isArray(fallback) ? fallback.map(String).map(v => v.trim()).filter(Boolean) : [];
+}
+
 function renderNodeContent(node, updateNode, isPreview = false) {
   const p = node.props || {};
   const handleTextChange = (newText) => {
@@ -259,8 +277,17 @@ function renderNodeContent(node, updateNode, isPreview = false) {
           <span>{p.src ? "Video" : "Video"}</span>
         </div>
       );
-    case "navbar":
-      return <div style={{ background: p.bg || "#0f172a", color: p.color || "#f1f5f9", width: "100%", height: "100%", display: "flex", alignItems: "center", padding: "0 20px", gap: 24, fontSize: 14, fontWeight: 600 }}><span style={{ fontWeight: 800, fontSize: 16 }}>{p.brand || "Brand"}</span><span style={{ opacity: 0.6, fontSize: 12 }}>{p.links || "Home · About · Contact"}</span></div>;
+    case "navbar": {
+      const links = normalizeList(p.links, ["Home", "About", "Contact"]);
+      return (
+        <div style={{ background: p.bg || "#0f172a", color: p.color || "#f1f5f9", width: "100%", height: "100%", display: "flex", alignItems: "center", padding: "0 20px", gap: 24, fontSize: 14, fontWeight: 600 }}>
+          <span style={{ fontWeight: 800, fontSize: 16 }}>{p.brand || "Brand"}</span>
+          <div style={{ display: "flex", gap: 18, alignItems: "center", opacity: 0.8, fontSize: 12 }}>
+            {links.map((link, index) => <span key={`${link}-${index}`}>{link}</span>)}
+          </div>
+        </div>
+      );
+    }
     case "footer":
       return <div style={{ background: p.bg || "#0f172a", color: p.color || "#94a3b8", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>{p.text || "Footer"}</div>;
     case "hero":
@@ -325,8 +352,10 @@ function renderNodeContent(node, updateNode, isPreview = false) {
         </div>
       );
     }
-    case "select":
-      return <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", gap: 4 }}>{p.label && <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", lineHeight: "1.2" }}>{p.label}</label>}<div style={{ flex: 1, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 10px", fontSize: 13, color: "#94a3b8" }}><span>{(p.options || "Option 1").split(",")[0].trim()}</span><span>▾</span></div></div>;
+    case "select": {
+      const options = normalizeList(p.options, ["Option 1"]);
+      return <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", gap: 4 }}>{p.label && <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", lineHeight: "1.2" }}>{p.label}</label>}<div style={{ flex: 1, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 10px", fontSize: 13, color: "#94a3b8" }}><span>{options[0] || "Option 1"}</span><span>▾</span></div></div>;
+    }
     case "checkbox":
       return <div style={{ display: "flex", alignItems: "center", gap: 8, height: "100%", fontSize: 13, color: "#374151" }}><div style={{ width: 16, height: 16, border: "2px solid #6366f1", borderRadius: 4, background: "#6366f1", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ color: "#fff", fontSize: 10 }}>✓</span></div>{p.label || "Checkbox"}</div>;
     case "textarea": {
@@ -396,12 +425,16 @@ function renderNodeContent(node, updateNode, isPreview = false) {
       );
     case "formblock":
       return <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "16px", width: "100%", height: "100%", display: "flex", flexDirection: "column", gap: 8 }}><div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>{p.title || "Form"}</div><div style={{ flex: 1, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6 }} /><button style={{ background: "#6366f1", color: "#fff", border: "none", borderRadius: 7, padding: "8px", fontSize: 13, fontWeight: 600 }}>{p.cta || "Submit"}</button></div>;
-    case "tabs":
-      return <div style={{ display: "flex", gap: 2, height: "100%", alignItems: "center", background: "#f1f5f9", borderRadius: 8, padding: "3px" }}>{(p.tabs || "Tab 1, Tab 2").split(",").map((t, i) => <div key={i} style={{ flex: 1, height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: i === 0 ? "#fff" : "transparent", borderRadius: 6, fontSize: 12, fontWeight: 600, color: i === 0 ? "#0f172a" : "#64748b" }}>{t.trim()}</div>)}</div>;
+    case "tabs": {
+      const tabs = normalizeList(p.tabs, ["Tab 1", "Tab 2"]);
+      return <div style={{ display: "flex", gap: 2, height: "100%", alignItems: "center", background: "#f1f5f9", borderRadius: 8, padding: "3px" }}>{tabs.map((t, i) => <div key={i} style={{ flex: 1, height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: i === 0 ? "#fff" : "transparent", borderRadius: 6, fontSize: 12, fontWeight: 600, color: i === 0 ? "#0f172a" : "#64748b" }}>{t}</div>)}</div>;
+    }
     case "productcard":
       return <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}><div style={{ flex: 1, background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#94a3b8" }}>Product Image</div><div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 4 }}><div style={{ fontSize: 11, color: "#6366f1", fontWeight: 600 }}>{p.brand || "Brand"}</div><div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{p.name || "Product"}</div><div style={{ fontSize: 14, fontWeight: 800, color: "#059669" }}>{p.price || "$0.00"}</div><button style={{ background: "#6366f1", color: "#fff", border: "none", borderRadius: 6, padding: "6px", fontSize: 11, fontWeight: 600 }}>Add to Cart</button></div></div>;
-    case "pricingcard":
-      return <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, width: "100%", height: "100%", padding: "16px", display: "flex", flexDirection: "column", gap: 8 }}><div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a" }}>{p.plan || "Plan"}</div><div style={{ fontSize: 24, fontWeight: 800, color: "#6366f1" }}>{p.price || "$0/mo"}</div><div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>{(p.features || "Feature 1, Feature 2").split(",").map((f, i) => <div key={i} style={{ fontSize: 12, color: "#475569", display: "flex", gap: 6 }}><span style={{ color: "#22c55e" }}>✓</span>{f.trim()}</div>)}</div><button style={{ background: "#6366f1", color: "#fff", border: "none", borderRadius: 7, padding: "8px", fontSize: 13, fontWeight: 600 }}>Get Started</button></div>;
+    case "pricingcard": {
+      const features = normalizeList(p.features, ["Feature 1", "Feature 2"]);
+      return <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, width: "100%", height: "100%", padding: "16px", display: "flex", flexDirection: "column", gap: 8 }}><div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a" }}>{p.plan || "Plan"}</div><div style={{ fontSize: 24, fontWeight: 800, color: "#6366f1" }}>{p.price || "$0/mo"}</div><div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>{features.map((f, i) => <div key={i} style={{ fontSize: 12, color: "#475569", display: "flex", gap: 6 }}><span style={{ color: "#22c55e" }}>✓</span>{f}</div>)}</div><button style={{ background: "#6366f1", color: "#fff", border: "none", borderRadius: 7, padding: "8px", fontSize: 13, fontWeight: 600 }}>Get Started</button></div>;
+    }
     case "testimonial":
       return <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, width: "100%", height: "100%", padding: "16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}><div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6, fontStyle: "italic" }}>"{p.quote || "Great product!"}"</div><div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a" }}>{p.author || "Author"} <span style={{ color: "#94a3b8", fontWeight: 400 }}>— {p.role || "Role"}</span></div></div>;
     case "blogcard":
@@ -1067,28 +1100,57 @@ export default function Builder({ token, projectId, onBack }) {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         credentials: "include",
-        body: JSON.stringify({ prompt: aiPrompt }),
+        body: JSON.stringify({ prompt: aiPrompt, websiteType: "website" }),
       });
       const data = await res.json();
-      if (data.success) {
-        const mapped = (data.payload.components || []).map((c, i) => ({
-          id: `${c.type}-ai-${Date.now()}-${i}`,
-          type: c.type,
-          x: snap(c.position?.x || 40),
-          y: snap(c.position?.y || i * 80 + 40),
-          w: 400, h: 80,
-          props: { text: c.properties?.content || c.properties?.text || c.type, heading: c.properties?.content || c.type },
-          locked: false, hidden: false,
-          name: c.type,
-        }));
-        push(mapped);
-        setAiPrompt("");
-        showToast("AI layout generated");
-      } else {
-        showToast(data.message, "error");
+
+      if (!data.success || !Array.isArray(data.payload?.components) || data.payload.components.length === 0) {
+        showToast(data.message || "AI generation returned no valid components.", "error");
+        return;
       }
-    } catch { showToast("AI request failed", "error"); }
-    finally { setAiLoading(false); }
+
+      const mapped = data.payload.components.map((c, i) => {
+        const baseType = String(c.type || "container").toLowerCase();
+        const defaultW = (() => {
+          if (["navbar", "footer", "section", "hero", "imagegrid", "container"].includes(baseType)) return 760;
+          if (["text", "heading", "button", "card", "badge", "alert", "testimonial", "blogcard", "statcard", "input"].includes(baseType)) return 360;
+          if (["image"].includes(baseType)) return 420;
+          if (["productcard", "pricingcard"].includes(baseType)) return 260;
+          return 320;
+        })();
+
+        const defaultH = (() => {
+          if (["navbar", "footer"].includes(baseType)) return 72;
+          if (["hero"].includes(baseType)) return 260;
+          if (["imagegrid"].includes(baseType)) return 340;
+          if (["productcard", "pricingcard", "card", "blogcard"].includes(baseType)) return 220;
+          if (["input", "textarea", "select", "checkbox"].includes(baseType)) return 48;
+          return 100;
+        })();
+
+        return {
+          id: c.id || `${baseType}-ai-${Date.now()}-${i}`,
+          type: baseType,
+          x: Number.isFinite(Number(c.position?.x)) ? snap(Number(c.position.x)) : 40 + (i % 3) * 30,
+          y: Number.isFinite(Number(c.position?.y)) ? snap(Number(c.position.y)) : 40 + Math.floor(i / 3) * 120,
+          w: Number(c.styles?.width) || defaultW,
+          h: Number(c.styles?.height) || defaultH,
+          props: c.properties || {},
+          locked: false,
+          hidden: false,
+          name: c.properties?.heading || c.properties?.title || c.properties?.text || baseType,
+        };
+      });
+
+      push(prev => [...prev, ...mapped]);
+      setAiPrompt("");
+      showToast("AI layout generated");
+    } catch (error) {
+      const message = error?.message || "AI request failed";
+      showToast(message, "error");
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   // ── Save ──
