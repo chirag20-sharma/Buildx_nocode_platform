@@ -1,144 +1,175 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { respond } from "../utils/respond.js";
+
+const ALLOWED_COMPONENT_TYPES = new Set([
+  "section",
+  "container",
+  "columns",
+  "text",
+  "heading",
+  "button",
+  "divider",
+  "spacer",
+  "image",
+  "imagegrid",
+  "video",
+  "navbar",
+  "footer",
+  "card",
+  "badge",
+  "alert",
+  "tabs",
+  "input",
+  "textarea",
+  "select",
+  "checkbox",
+  "loginform",
+  "formblock",
+  "hero",
+  "productcard",
+  "pricingcard",
+  "testimonial",
+  "blogcard",
+  "statcard",
+  "productgrid",
+]);
+
+const MAX_COMPONENTS = 12;
+
+function inferWebsiteType(prompt) {
+  const text = String(prompt || "").toLowerCase();
+  if (/restaurant|cafe|food|menu|dining/.test(text)) return "restaurant";
+  if (/portfolio|designer|photographer|developer|resume|about me/.test(text)) return "portfolio";
+  if (/ecommerce|shop|store|buy|product|cart/.test(text)) return "ecommerce";
+  if (/blog|article|news|magazine/.test(text)) return "blog";
+  if (/guitar|music|instrument|band/.test(text)) return "guitar store";
+  if (/real estate|property|listing/.test(text)) return "real estate";
+  if (/travel|hotel|vacation|tour/.test(text)) return "travel";
+  return "website";
+}
+
+export function validateAiComponents(rawComponents) {
+  if (!Array.isArray(rawComponents)) {
+    throw new Error("AI output is invalid: expected a JSON array of components.");
+  }
+
+  if (rawComponents.length === 0) {
+    throw new Error("AI output is invalid: no components were generated.");
+  }
+
+  if (rawComponents.length > MAX_COMPONENTS) {
+    throw new Error("AI output is invalid: generated too many components.");
+  }
+
+  return rawComponents.map((component, index) => {
+    if (!component || typeof component !== "object" || Array.isArray(component)) {
+      throw new Error(`AI output is invalid: component #${index + 1} is malformed.`);
+    }
+
+    const type = String(component.type || "").trim().toLowerCase();
+    if (!ALLOWED_COMPONENT_TYPES.has(type)) {
+      throw new Error(`AI output is invalid: unsupported component type "${component.type}".`);
+    }
+
+    const properties = component.properties && typeof component.properties === "object" && !Array.isArray(component.properties)
+      ? component.properties
+      : {};
+
+    const styles = component.styles && typeof component.styles === "object" && !Array.isArray(component.styles)
+      ? component.styles
+      : {};
+
+    const position = component.position && typeof component.position === "object" && !Array.isArray(component.position)
+      ? {
+          x: Number.isFinite(Number(component.position.x)) ? Number(component.position.x) : 40 + (index * 20),
+          y: Number.isFinite(Number(component.position.y)) ? Number(component.position.y) : 40 + (index * 80),
+        }
+      : { x: 40 + (index * 20), y: 40 + (index * 80) };
+
+    return {
+      id: String(component.id || `ai-${type}-${index + 1}`).trim() || `ai-${type}-${index + 1}`,
+      type,
+      properties,
+      styles,
+      position,
+    };
+  });
+}
+
+function parseStructuredJson(rawText) {
+  if (!rawText || !String(rawText).trim()) {
+    throw new Error("Gemini returned an empty response.");
+  }
+
+  const text = String(rawText).trim();
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  const candidate = fenced ? fenced[1] : text;
+
+  try {
+    const parsed = JSON.parse(candidate);
+    if (parsed && Array.isArray(parsed.components)) {
+      return parsed.components;
+    }
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+    if (parsed && typeof parsed === "object" && parsed.type) {
+      return [parsed];
+    }
+    throw new Error("AI output is invalid: expected a component array.");
+  } catch (error) {
+    throw new Error("AI output is invalid: Gemini response was not valid JSON.");
+  }
+}
+
+async function generateComponentsFromGemini(prompt, websiteType) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || !apiKey.trim()) {
+    throw new Error("Gemini API key is not configured on the backend. Set GEMINI_API_KEY before trying AI generation.");
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const modelName = process.env.GEMINI_MODEL_NAME || "gemini-3.6-flash";
+  const model = genAI.getGenerativeModel({ model: modelName });
+
+  const typeName = websiteType || inferWebsiteType(prompt);
+  const instruction = `You are BuildX AI. Generate only a JSON array of BuildX page components.
+Rules:
+- Return strict JSON only, no markdown fences, no HTML, no JavaScript, no commentary.
+- Use BuildX types only: ${[...ALLOWED_COMPONENT_TYPES].join(", ")}.
+- Each component must match this structure: { "id": "string", "type": "string", "properties": { ... }, "styles": { ... }, "position": { "x": number, "y": number } }.
+- Keep the layout realistic for a ${typeName} website.
+- Prefer section, navbar, hero, text, heading, image, imagegrid, card, button, footer, productcard, testimonial, blogcard, formblock, input, textarea, pricingcard.
+- Include realistic content tailored to the prompt and website type.
+- Do not include random script tags, inline CSS strings, HTML fragments, or unsupported components.
+- Ensure x/y values are numbers and the overall result is visually coherent.
+User prompt: ${prompt}`;
+
+  const result = await model.generateContent(instruction);
+  const response = await result.response;
+  const text = response.text();
+  const parsed = parseStructuredJson(text);
+  return validateAiComponents(parsed);
+}
 
 export const generateDesign = async (req, res) => {
   try {
     const { prompt, websiteType } = req.body;
 
-    if (!prompt) {
+    if (!prompt || !String(prompt).trim()) {
       return respond(res, "Prompt is required", 400, false);
     }
 
-    // AI-generated component suggestions based on prompt
-    const aiComponents = generateComponentsFromPrompt(prompt, websiteType);
+    const normalizedPrompt = String(prompt).trim();
+    const detectedType = websiteType || inferWebsiteType(normalizedPrompt);
+    const aiComponents = await generateComponentsFromGemini(normalizedPrompt, detectedType);
 
     return respond(res, "Design generated successfully", 200, true, {
       components: aiComponents,
-      suggestion: `Generated ${aiComponents.length} components for your ${websiteType || 'website'}`
+      suggestion: `Generated ${aiComponents.length} BuildX components for your ${detectedType} website.`
     });
   } catch (error) {
     console.error("AI Generation Error:", error);
-    return respond(res, "Failed to generate design: " + error.message, 500, false);
+    return respond(res, error.message || "Failed to generate design", 500, false);
   }
 };
-
-function generateComponentsFromPrompt(prompt, websiteType) {
-  const lowerPrompt = prompt.toLowerCase();
-  const components = [];
-  let yPos = 50;
-  let componentId = 1;
-
-  if (lowerPrompt.includes("navbar") || lowerPrompt.includes("navigation") || lowerPrompt.includes("menu")) {
-    components.push({
-      id: `ai-navbar-${componentId++}`,
-      type: "navbar",
-      properties: { text: "Navigation Menu" },
-      styles: { background: "#667eea", color: "white", padding: "20px" },
-      position: { x: 50, y: yPos }
-    });
-    yPos += 80;
-  }
-
-  if (lowerPrompt.includes("hero") || lowerPrompt.includes("headline") || lowerPrompt.includes("title")) {
-    components.push({
-      id: `ai-hero-${componentId++}`,
-      type: "hero",
-      properties: { content: extractTitle(prompt) || "Welcome to Our Website" },
-      styles: { fontSize: "48px", fontWeight: "bold", textAlign: "center", color: "#2c3e50" },
-      position: { x: 50, y: yPos }
-    });
-    yPos += 100;
-  }
-
-  if (lowerPrompt.includes("button") || lowerPrompt.includes("cta") || lowerPrompt.includes("call to action")) {
-    const buttonText = extractButtonText(prompt) || "Get Started";
-    components.push({
-      id: `ai-button-${componentId++}`,
-      type: "button",
-      properties: { text: buttonText },
-      styles: { background: "#28a745", color: "white", padding: "15px 40px", borderRadius: "8px" },
-      position: { x: 50, y: yPos }
-    });
-    yPos += 80;
-  }
-
-  if (lowerPrompt.includes("image") || lowerPrompt.includes("photo") || lowerPrompt.includes("picture")) {
-    components.push({
-      id: `ai-image-${componentId++}`,
-      type: "image",
-      properties: { src: "https://via.placeholder.com/400x300", alt: "Image" },
-      styles: { width: "400px", height: "300px" },
-      position: { x: 50, y: yPos }
-    });
-    yPos += 320;
-  }
-
-  if (lowerPrompt.includes("text") || lowerPrompt.includes("paragraph") || lowerPrompt.includes("description")) {
-    components.push({
-      id: `ai-text-${componentId++}`,
-      type: "text",
-      properties: { content: "Your content goes here. Edit this text to customize." },
-      styles: { fontSize: "18px", color: "#6c757d", lineHeight: "1.6" },
-      position: { x: 50, y: yPos }
-    });
-    yPos += 80;
-  }
-
-  if (lowerPrompt.includes("card") || lowerPrompt.includes("feature")) {
-    components.push({
-      id: `ai-card-${componentId++}`,
-      type: "card",
-      properties: { title: "Feature Card" },
-      styles: { padding: "30px", background: "#f8f9fa", borderRadius: "12px", border: "2px solid #dee2e6" },
-      position: { x: 50, y: yPos }
-    });
-    yPos += 120;
-  }
-
-  if (components.length === 0) {
-    components.push(
-      {
-        id: `ai-hero-${componentId++}`,
-        type: "hero",
-        properties: { content: "Your Website Title" },
-        styles: { fontSize: "48px", fontWeight: "bold", textAlign: "center" },
-        position: { x: 50, y: 50 }
-      },
-      {
-        id: `ai-text-${componentId++}`,
-        type: "text",
-        properties: { content: prompt },
-        styles: { fontSize: "18px", color: "#6c757d" },
-        position: { x: 50, y: 150 }
-      },
-      {
-        id: `ai-button-${componentId++}`,
-        type: "button",
-        properties: { text: "Learn More" },
-        styles: { background: "#667eea", color: "white", padding: "12px 30px", borderRadius: "8px" },
-        position: { x: 50, y: 250 }
-      }
-    );
-  }
-
-  return components;
-}
-
-function extractTitle(prompt) {
-  const titleMatch = prompt.match(/title[:\s]+["']?([^"'\n]+)["']?/i);
-  if (titleMatch) return titleMatch[1].trim();
-  
-  const forMatch = prompt.match(/for\s+(.+?)(?:\s+with|\s+that|\s+website|$)/i);
-  if (forMatch) return forMatch[1].trim();
-  
-  return null;
-}
-
-function extractButtonText(prompt) {
-  const buttonMatch = prompt.match(/button[:\s]+["']?([^"'\n]+)["']?/i);
-  if (buttonMatch) return buttonMatch[1].trim();
-  
-  const ctaMatch = prompt.match(/cta[:\s]+["']?([^"'\n]+)["']?/i);
-  if (ctaMatch) return ctaMatch[1].trim();
-  
-  return null;
-}
