@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
+import { useParams, Link } from "react-router-dom";
 import "./published.css";
-
-const API = "http://localhost:5000/api/v1";
+import { API_BASE as API } from "./api.js";
 
 export default function PublishedPage({ projectId }) {
+  const { projectId: routeProjectId } = useParams();
+  const activeProjectId = projectId || routeProjectId;
+
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -11,7 +14,7 @@ export default function PublishedPage({ projectId }) {
   useEffect(() => {
     const fetchPublishedProject = async () => {
       try {
-        const res = await fetch(`${API}/projects/public/${projectId}`);
+        const res = await fetch(`${API}/projects/public/${activeProjectId}`);
         const data = await res.json();
         if (data.success && data.payload?.project) {
           setProject(data.payload.project);
@@ -26,19 +29,19 @@ export default function PublishedPage({ projectId }) {
       }
     };
 
-    if (projectId) {
+    if (activeProjectId) {
       fetchPublishedProject();
     } else {
       setError("No website ID specified in the URL.");
       setLoading(false);
     }
-  }, [projectId]);
+  }, [activeProjectId]);
 
   if (loading) {
     return (
-      <div className="pub-status-screen">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0f0f13] text-slate-100 text-center p-8 gap-4">
         <div style={{ width: 36, height: 36, border: "3px solid #1e1e2e", borderTopColor: "#6366f1", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-        <h2>Loading website…</h2>
+        <h2 className="text-2xl font-bold text-slate-100">Loading website…</h2>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -46,18 +49,70 @@ export default function PublishedPage({ projectId }) {
 
   if (error || !project) {
     return (
-      <div className="pub-status-screen">
-        <div className="pub-status-icon">🔒</div>
-        <h2>Website Not Available</h2>
-        <p>{error || "This website is either private, unpublished, or does not exist."}</p>
-        <a href="/" className="pub-home-btn">Go to BuildX Platform</a>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0f0f13] text-slate-100 text-center p-8 gap-4">
+        <div className="w-16 h-16 rounded-2xl bg-indigo-500/12 border border-indigo-500/25 flex items-center justify-center text-3xl mb-2">🔒</div>
+        <h2 className="text-2xl font-bold text-slate-100">Website Not Available</h2>
+        <p className="text-[14.5px] text-slate-400 max-w-[420px] leading-relaxed">{error || "This website is either private, unpublished, or does not exist."}</p>
+        <Link to="/" className="mt-3 bg-bx-brand hover:bg-bx-brand-hover text-white rounded-lg px-6 py-2.5 text-sm font-semibold transition active:scale-[0.98]">
+          Go to BuildX Platform
+        </Link>
       </div>
     );
   }
 
-  // Separate regular canvas components and product grids
-  const regularComponents = (project.components || []).filter((c) => c.type !== "productGrid");
-  const productGridComponents = (project.components || []).filter((c) => c.type === "productGrid");
+  const allComponents = Array.isArray(project.components) ? project.components : [];
+  const regularComponents = allComponents.filter((c) => c.type !== "productGrid" && !c.parentId);
+  const productGridComponents = allComponents.filter((c) => c.type === "productGrid");
+
+  const renderPublishedComponent = (comp, depth = 0) => {
+    const text = comp.properties?.text || comp.properties?.content || comp.properties?.title || comp.properties?.brand || comp.properties?.heading || "";
+    const children = allComponents.filter((child) => child.parentId === comp.id);
+
+    if (comp.type === "section" || comp.type === "container") {
+      return (
+        <div
+          key={comp.id}
+          className={`pub-comp pub-comp-${comp.type}`}
+          style={{
+            background: comp.properties?.bg || "#f8fafc",
+            padding: 12,
+            borderRadius: 8,
+            width: "100%",
+            minHeight: comp.styles?.height || 120,
+          }}
+        >
+          {children.length > 0 ? children.map((child) => renderPublishedComponent(child, depth + 1)) : (text ? <span>{text}</span> : null)}
+        </div>
+      );
+    }
+
+    if (comp.type === "columns") {
+      const cols = Math.max(1, Number(comp.properties?.cols || children.length || 2));
+      return (
+        <div key={comp.id} className="pub-comp pub-comp-columns" style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: 12, width: "100%" }}>
+          {children.length > 0 ? children.map((child) => renderPublishedComponent(child, depth + 1)) : null}
+        </div>
+      );
+    }
+
+    return (
+      <div
+        key={comp.id}
+        className={`pub-comp pub-comp-${comp.type}`}
+        style={{ left: comp.position?.x ?? 0, top: comp.position?.y ?? 0, width: comp.styles?.width ?? 280, height: comp.styles?.height ?? 60 }}
+      >
+        {comp.type === "image" ? (
+          comp.properties?.src ? <img src={comp.properties.src} alt={comp.properties.alt || "Image"} /> : null
+        ) : comp.type === "button" ? (
+          <button className="pub-comp-button" style={{ width: "100%", height: "100%" }} onClick={() => alert(`Clicked: ${text || "Button"}`)}>
+            {text || "Button"}
+          </button>
+        ) : (
+          <span>{text || comp.type}</span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="pub-root">
@@ -65,37 +120,7 @@ export default function PublishedPage({ projectId }) {
         {/* Absolute-positioned components layer */}
         {regularComponents.length > 0 && (
           <div className="pub-canvas-layer">
-            {regularComponents.map((comp, idx) => {
-              const x = comp.position?.x ?? 0;
-              const y = comp.position?.y ?? 0;
-              const w = comp.styles?.width ?? 280;
-              const h = comp.styles?.height ?? 60;
-              const text = comp.properties?.text || comp.properties?.content || comp.properties?.title || "";
-
-              return (
-                <div
-                  key={comp.id || `comp-${idx}`}
-                  className={`pub-comp pub-comp-${comp.type}`}
-                  style={{ left: x, top: y, width: w, height: h }}
-                >
-                  {comp.type === "image" ? (
-                    comp.properties?.src ? (
-                      <img src={comp.properties.src} alt={comp.properties.alt || "Image"} />
-                    ) : null
-                  ) : comp.type === "button" ? (
-                    <button
-                      className="pub-comp-button"
-                      style={{ width: "100%", height: "100%" }}
-                      onClick={() => alert(`Clicked: ${text || "Button"}`)}
-                    >
-                      {text || "Button"}
-                    </button>
-                  ) : (
-                    <span>{text}</span>
-                  )}
-                </div>
-              );
-            })}
+            {regularComponents.map((comp) => renderPublishedComponent(comp, 0))}
           </div>
         )}
 
@@ -140,10 +165,18 @@ export default function PublishedPage({ projectId }) {
       </main>
 
       {/* Floating "Built with BuildX" Badge */}
-      <a href="/" className="pub-badge" target="_blank" rel="noopener noreferrer" title="Build your website with BuildX">
-        <span className="pub-badge-logo">B</span>
+      <Link
+        to="/"
+        className="fixed bottom-5 right-5 flex items-center gap-2 bg-[#0f0f13] text-slate-100 border border-[#1e1e2e] hover:border-bx-brand rounded-full py-1.5 px-3.5 pl-2.5 text-xs font-semibold shadow-2xl transition hover:-translate-y-0.5 z-[9999]"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Build your website with BuildX"
+      >
+        <span className="w-5 h-5 bg-bx-brand rounded-full flex items-center justify-center text-[11px] font-extrabold text-white">
+          B
+        </span>
         <span>Built with BuildX</span>
-      </a>
+      </Link>
     </div>
   );
 }

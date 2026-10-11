@@ -1,191 +1,611 @@
-import "./landing.css";
+import { Link } from "react-router-dom";
 
 const FEATURES = [
-  { icon: "✦", title: "Visual Canvas", desc: "Drag, drop, resize, and align elements with pixel-perfect precision. Free positioning on an infinite canvas." },
-  { icon: "⚡", title: "AI Builder", desc: "Describe what you want to build. BuildX AI generates pages, components, and layouts instantly." },
-  { icon: "🎨", title: "50+ Templates", desc: "Start from a professionally designed template for any industry — SaaS, e-commerce, blog, restaurant, and more." },
-  { icon: "🗄", title: "No-Code Backend", desc: "Create databases, authentication, and APIs visually. No SQL, no server config, no code required." },
-  { icon: "📱", title: "Responsive Design", desc: "Design for desktop, tablet, and mobile independently. Every breakpoint, fully customizable." },
-  { icon: "🚀", title: "One-Click Deploy", desc: "Publish your website instantly. Custom domains, SSL, and CDN included." },
+  {
+    icon: "✦",
+    title: "Visual Canvas",
+    desc: "Drag, drop, resize, and align elements with pixel-perfect precision. Free positioning on an infinite responsive canvas.",
+    tag: "Core Engine",
+  },
+  {
+    icon: "⚡",
+    title: "AI Website Builder",
+    desc: "Describe what you want in plain English. BuildX AI automatically generates layouts, copy, palettes, and components instantly.",
+    tag: "AI Powered",
+  },
+  {
+    icon: "🎨",
+    title: "50+ Curated Templates",
+    desc: "Production-ready website architectures for SaaS, e-commerce, portfolios, blogs, and restaurants designed by top creators.",
+    tag: "Design Ready",
+  },
+  {
+    icon: "🗄",
+    title: "Visual Data & Forms",
+    desc: "Capture form submissions, bind dynamic content, and store records without configuring complex databases or SQL servers.",
+    tag: "No-Code Data",
+  },
+  {
+    icon: "📱",
+    title: "Multi-Breakpoint Responsive",
+    desc: "Design desktop, tablet, and mobile layouts with independent control. Ensure your website looks flawless on any screen size.",
+    tag: "Responsive",
+  },
+  {
+    icon: "🚀",
+    title: "Instant Global Publishing",
+    desc: "Deploy your site globally with one click. Get instant live URLs, SSL encryption, CDN caching, and exportable clean HTML/CSS.",
+    tag: "1-Click Live",
+  },
 ];
 
 const TEMPLATES = [
-  { name: "Guitar Store",       cat: "E-commerce", color: "#f59e0b", bg: "linear-gradient(135deg,#1c1008,#2d1a06)" },
-  { name: "SaaS Landing",       cat: "SaaS",       color: "#6366f1", bg: "linear-gradient(135deg,#1e1b4b,#0f0f1a)" },
-  { name: "Editorial Blog",     cat: "Blog",       color: "#ef4444", bg: "linear-gradient(135deg,#0f172a,#1e293b)" },
-  { name: "Designer Portfolio", cat: "Portfolio",  color: "#22d3ee", bg: "linear-gradient(135deg,#09090b,#0a0e1a)" },
-  { name: "Restaurant",         cat: "Restaurant", color: "#f59e0b", bg: "linear-gradient(135deg,#0c0a08,#1a1208)" },
-  { name: "Admin Dashboard",    cat: "Dashboard",  color: "#34d399", bg: "linear-gradient(135deg,#0a0f0a,#0f1a14)" },
+  {
+    name: "SaaS Landing",
+    cat: "SaaS",
+    color: "#818cf8",
+    gradient: "from-indigo-950/80 via-slate-900 to-slate-950",
+    accent: "bg-indigo-500",
+    border: "border-indigo-500/30",
+    headline: "Transform your workflow with intelligent automation",
+    pill: "Software",
+  },
+  {
+    name: "Guitar & Gear Store",
+    cat: "E-Commerce",
+    color: "#f59e0b",
+    gradient: "from-amber-950/80 via-zinc-900 to-black",
+    accent: "bg-amber-500",
+    border: "border-amber-500/30",
+    headline: "Handcrafted vintage & acoustic instruments",
+    pill: "Retail",
+  },
+  {
+    name: "Tech & Editorial Blog",
+    cat: "Editorial",
+    color: "#f43f5e",
+    gradient: "from-rose-950/80 via-slate-900 to-slate-950",
+    accent: "bg-rose-500",
+    border: "border-rose-500/30",
+    headline: "Deep dives into engineering, AI, and digital culture",
+    pill: "Publications",
+  },
+  {
+    name: "Designer Portfolio",
+    cat: "Portfolio",
+    color: "#06b6d4",
+    gradient: "from-cyan-950/80 via-zinc-900 to-black",
+    accent: "bg-cyan-500",
+    border: "border-cyan-500/30",
+    headline: "Product designer crafting digital experiences",
+    pill: "Creative",
+  },
+  {
+    name: "Artisan Restaurant",
+    cat: "Hospitality",
+    color: "#eab308",
+    gradient: "from-yellow-950/80 via-neutral-900 to-black",
+    accent: "bg-yellow-500",
+    border: "border-yellow-500/30",
+    headline: "Farm-to-table culinary experiences & seasonal menus",
+    pill: "Dining",
+  },
+  {
+    name: "Executive Analytics",
+    cat: "Dashboard",
+    color: "#10b981",
+    gradient: "from-emerald-950/80 via-slate-900 to-slate-950",
+    accent: "bg-emerald-500",
+    border: "border-emerald-500/30",
+    headline: "Real-time metrics, funnel telemetry, and revenue graphs",
+    pill: "Analytics",
+  },
 ];
 
 const STEPS = [
-  { n: "01", title: "Choose a template or start blank", desc: "Pick from 50+ industry-specific templates or start from a blank canvas." },
-  { n: "02", title: "Design visually", desc: "Drag, drop, and style every element. Use AI to generate sections instantly." },
-  { n: "03", title: "Connect your data", desc: "Create collections, bind data to components, and add authentication — no code." },
-  { n: "04", title: "Publish", desc: "Deploy with one click. Your site is live on a fast global CDN." },
+  {
+    n: "01",
+    title: "Pick a Template or Start Blank",
+    desc: "Choose from 50+ industry-specific designs or begin from scratch with complete creative freedom on an infinite canvas.",
+  },
+  {
+    n: "02",
+    title: "Design Visually with Real-time AI",
+    desc: "Drag, style, and reorder elements. Prompt BuildX AI to instantly generate sections, marketing copy, and imagery.",
+  },
+  {
+    n: "03",
+    title: "Connect Data & Customize Props",
+    desc: "Attach forms, add buttons with custom actions, bind image grids, and set custom fonts and colors with zero code.",
+  },
+  {
+    n: "04",
+    title: "Publish Globally with One Click",
+    desc: "Deploy your project live to the web instantly with SSL, fast global CDN distribution, and a shareable live URL.",
+  },
 ];
 
 export default function LandingPage({ onGetStarted, onSignIn }) {
   return (
-    <div className="lp-root">
+    <div className="min-h-screen bg-[#07070c] text-[#f0f0ff] selection:bg-indigo-500 selection:text-white font-sans antialiased overflow-x-hidden">
+      {/* ── Background Glow Effects ── */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute top-[-150px] left-1/2 -translate-x-1/2 w-[900px] h-[550px] bg-gradient-to-b from-indigo-600/18 via-purple-600/12 to-transparent blur-[120px] rounded-full" />
+        <div className="absolute top-[800px] -left-[200px] w-[500px] h-[500px] bg-indigo-900/10 blur-[130px] rounded-full" />
+        <div className="absolute top-[1400px] -right-[200px] w-[550px] h-[550px] bg-purple-900/10 blur-[130px] rounded-full" />
+      </div>
+
       {/* ── Navbar ── */}
-      <nav className="lp-nav">
-        <div className="lp-nav-inner">
-          <div className="lp-logo">
-            <span className="lp-logo-mark">B</span>
-            <span className="lp-logo-text">BuildX</span>
+      <nav className="sticky top-0 z-50 bg-[#07070c]/80 backdrop-blur-xl border-b border-white/[0.08] transition-all">
+        <div className="max-w-7xl mx-auto px-6 lg:px-12 h-16 flex items-center justify-between">
+          {/* Brand */}
+          <Link to="/" className="flex items-center gap-3 group">
+            <span className="w-9 h-9 bg-gradient-to-tr from-indigo-600 to-indigo-400 rounded-xl flex items-center justify-center font-extrabold text-base text-white shadow-[0_0_20px_rgba(99,102,241,0.5)] group-hover:scale-105 transition-transform">
+              B
+            </span>
+            <span className="text-lg font-bold tracking-tight text-white group-hover:text-indigo-200 transition-colors">
+              BuildX
+            </span>
+          </Link>
+
+          {/* Navigation Links */}
+          <div className="hidden md:flex items-center gap-1 bg-white/[0.03] border border-white/[0.06] rounded-full px-4 py-1.5 shadow-inner">
+            <a
+              href="#features"
+              className="text-xs font-medium text-slate-300 hover:text-white px-3.5 py-1.5 rounded-full hover:bg-white/[0.06] transition"
+            >
+              Features
+            </a>
+            <a
+              href="#templates"
+              className="text-xs font-medium text-slate-300 hover:text-white px-3.5 py-1.5 rounded-full hover:bg-white/[0.06] transition"
+            >
+              Templates
+            </a>
+            <a
+              href="#how"
+              className="text-xs font-medium text-slate-300 hover:text-white px-3.5 py-1.5 rounded-full hover:bg-white/[0.06] transition"
+            >
+              How it works
+            </a>
           </div>
-          <div className="lp-nav-links">
-            <a href="#features">Features</a>
-            <a href="#templates">Templates</a>
-            <a href="#how">How it works</a>
-          </div>
-          <div className="lp-nav-actions">
-            <button className="lp-btn-ghost" onClick={onSignIn}>Sign in</button>
-            <button className="lp-btn-primary" onClick={onGetStarted}>Start free</button>
+
+          {/* Actions */}
+          <div className="flex items-center gap-3">
+            <Link
+              to="/signin"
+              className="text-xs font-semibold text-slate-300 hover:text-white px-4 py-2 rounded-lg hover:bg-white/[0.05] transition"
+              onClick={onSignIn}
+            >
+              Sign In
+            </Link>
+            <Link
+              to="/signup"
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white text-xs font-bold px-4.5 py-2.5 rounded-xl shadow-[0_0_25px_rgba(99,102,241,0.45)] hover:shadow-[0_0_35px_rgba(99,102,241,0.65)] active:scale-95 transition-all cursor-pointer"
+              onClick={onGetStarted}
+            >
+              Start Free →
+            </Link>
           </div>
         </div>
       </nav>
 
-      {/* ── Hero ── */}
-      <section className="lp-hero">
-        <div className="lp-hero-badge">
-          <span className="lp-hero-badge-dot" />
-          Now with AI generation
-        </div>
-        <h1 className="lp-hero-title">
-          Build websites and<br />
-          <span className="lp-hero-gradient">web apps visually.</span>
-        </h1>
-        <p className="lp-hero-sub">
-          Design with Figma-level freedom. Build with Wix-level simplicity.<br />
-          Connect a backend without writing a single line of code.
-        </p>
-        <div className="lp-hero-actions">
-          <button className="lp-btn-primary lp-btn-lg" onClick={onGetStarted}>
-            Start building free
-            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd"/></svg>
-          </button>
-          <button className="lp-btn-outline" onClick={onSignIn}>Sign in to your account</button>
-        </div>
-        <p className="lp-hero-note">Free forever · No credit card required · Deploy in minutes</p>
-
-        {/* Product preview mockup */}
-        <div className="lp-hero-preview">
-          <div className="lp-preview-bar">
-            <span /><span /><span />
-            <div className="lp-preview-url">buildx.app/editor</div>
+      {/* ── Hero Section ── */}
+      <section className="relative pt-20 md:pt-28 pb-20 px-6 lg:px-12 z-10">
+        <div className="max-w-4xl mx-auto flex flex-col items-center text-center gap-6">
+          {/* Pill Badge */}
+          <div className="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 rounded-full px-4 py-1.5 text-xs font-medium backdrop-blur-md shadow-[0_0_20px_rgba(99,102,241,0.15)]">
+            <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse shadow-[0_0_8px_#818cf8]" />
+            <span>BuildX 2.0 with Real-time AI Generation</span>
           </div>
-          <div className="lp-preview-body">
-            <div className="lp-preview-sidebar">
-              <div className="lp-ps-label">Components</div>
-              {["Section","Heading","Button","Image Grid","Card","Form"].map(c => (
-                <div key={c} className="lp-ps-item"><span />{c}</div>
-              ))}
-            </div>
-            <div className="lp-preview-canvas">
-              <div className="lp-pc-navbar" />
-              <div className="lp-pc-hero">
-                <div className="lp-pc-h1" />
-                <div className="lp-pc-h2" />
-                <div className="lp-pc-btn" />
-              </div>
-              <div className="lp-pc-cards">
-                <div className="lp-pc-card" /><div className="lp-pc-card" /><div className="lp-pc-card" />
-              </div>
-            </div>
-            <div className="lp-preview-props">
-              <div className="lp-pp-label">Properties</div>
-              <div className="lp-pp-row"><span />Columns</div>
-              <div className="lp-pp-row"><span />Gap</div>
-              <div className="lp-pp-row"><span />Aspect</div>
-              <div className="lp-pp-row"><span />Images</div>
-            </div>
+
+          {/* Main Title */}
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.08] text-white">
+            Build websites and<br />
+            <span className="bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300 bg-clip-text text-transparent">
+              web apps visually.
+            </span>
+          </h1>
+
+          {/* Subtitle */}
+          <p className="text-base sm:text-lg text-slate-300 max-w-2xl leading-relaxed">
+            Design with Figma-level creative freedom. Build with Wix-level simplicity.
+            Connect dynamic components and deploy live websites without writing code.
+          </p>
+
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row items-center gap-4 mt-2 w-full sm:w-auto justify-center">
+            <Link
+              to="/signup"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold text-sm px-8 py-3.5 rounded-xl shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:shadow-[0_0_40px_rgba(99,102,241,0.65)] hover:-translate-y-0.5 active:translate-y-0 transition-all cursor-pointer"
+              onClick={onGetStarted}
+            >
+              <span>Start Building Free</span>
+              <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </Link>
+
+            <Link
+              to="/dashboard"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 hover:border-white/20 text-slate-200 hover:text-white font-semibold text-sm px-6 py-3.5 rounded-xl backdrop-blur-md transition-all cursor-pointer"
+            >
+              <span>Explore Templates</span>
+              <span className="text-indigo-400">→</span>
+            </Link>
+          </div>
+
+          {/* Reassurance text */}
+          <div className="flex items-center gap-6 text-xs text-slate-400 mt-1">
+            <span>✓ No credit card required</span>
+            <span>✓ 50+ free templates</span>
+            <span>✓ Instant deployment</span>
           </div>
         </div>
-      </section>
 
-      {/* ── Features ── */}
-      <section className="lp-section" id="features">
-        <div className="lp-section-inner">
-          <div className="lp-section-label">Features</div>
-          <h2 className="lp-section-title">Everything you need to build<br />a real web application</h2>
-          <div className="lp-features-grid">
-            {FEATURES.map(f => (
-              <div key={f.title} className="lp-feature-card">
-                <div className="lp-feature-icon">{f.icon}</div>
-                <h3>{f.title}</h3>
-                <p>{f.desc}</p>
+        {/* ── High-Fidelity Product Preview Mockup ── */}
+        <div className="max-w-5xl mx-auto mt-14 relative group">
+          {/* Subtle Ambient Back-Glow */}
+          <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/25 via-purple-500/20 to-pink-500/20 rounded-3xl blur-2xl opacity-75 group-hover:opacity-100 transition duration-1000 -z-10" />
+
+          {/* Browser Container */}
+          <div className="bg-[#0e0e16] border border-white/[0.12] rounded-2xl overflow-hidden shadow-[0_25px_80px_rgba(0,0,0,0.85)]">
+            {/* Window Title Bar */}
+            <div className="h-11 bg-[#12121e] border-b border-white/[0.08] flex items-center justify-between px-4">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-[#ef4444]/80 inline-block" />
+                <span className="w-3 h-3 rounded-full bg-[#f59e0b]/80 inline-block" />
+                <span className="w-3 h-3 rounded-full bg-[#22c55e]/80 inline-block" />
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
+              <div className="flex items-center gap-2 bg-[#08080d] border border-white/[0.06] rounded-lg px-4 py-1 text-xs text-slate-400 font-mono">
+                <span className="text-indigo-400">https://</span>buildx.app/builder/demo-saas
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="px-2.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-semibold text-[11px] border border-indigo-500/30">
+                  Live Preview
+                </span>
+              </div>
+            </div>
 
-      {/* ── Templates ── */}
-      <section className="lp-section lp-section-dark" id="templates">
-        <div className="lp-section-inner">
-          <div className="lp-section-label">Templates</div>
-          <h2 className="lp-section-title">Start from a real website,<br />not a generic layout</h2>
-          <p className="lp-section-sub">Every template has its own information architecture, components, and visual identity — not just different text.</p>
-          <div className="lp-templates-grid">
-            {TEMPLATES.map(t => (
-              <div key={t.name} className="lp-template-card" style={{ background: t.bg }}>
-                <div className="lp-template-preview">
-                  <div className="lp-tp-nav" style={{ background: t.color + "44" }} />
-                  <div className="lp-tp-hero" />
-                  <div className="lp-tp-cards">
-                    <div /><div /><div />
+            {/* Inner Studio Work Area */}
+            <div className="flex h-[360px] md:h-[420px] bg-[#09090f]">
+              {/* Left Component Drawer */}
+              <div className="hidden sm:flex w-44 shrink-0 bg-[#0c0c14] border-r border-white/[0.06] p-3 flex-col gap-1.5">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
+                  Components
+                </div>
+                {[
+                  { name: "Navbar", icon: "☰" },
+                  { name: "Hero Header", icon: "✦" },
+                  { name: "Feature Grid", icon: "⊞" },
+                  { name: "CTA Banner", icon: "⚡" },
+                  { name: "Image Gallery", icon: "🖼" },
+                  { name: "Footer", icon: "▪" },
+                ].map((item, idx) => (
+                  <div
+                    key={item.name}
+                    className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
+                      idx === 1
+                        ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    <span className="text-indigo-400 text-xs">{item.icon}</span>
+                    <span>{item.name}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Central Visual Canvas Area */}
+              <div className="flex-1 p-5 flex flex-col gap-3.5 bg-[#08080d] overflow-hidden">
+                {/* Simulated Canvas Top Bar */}
+                <div className="h-9 bg-[#11111c] border border-white/[0.06] rounded-xl flex items-center justify-between px-3.5">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-md bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white">
+                      B
+                    </span>
+                    <span className="text-xs font-bold text-white">Acme Corp</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                    <span>Products</span>
+                    <span>Solutions</span>
+                    <span>Pricing</span>
+                    <span className="px-2 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-bold">
+                      Get Started
+                    </span>
                   </div>
                 </div>
-                <div className="lp-template-info">
-                  <span className="lp-template-cat" style={{ color: t.color }}>{t.cat}</span>
-                  <span className="lp-template-name">{t.name}</span>
+
+                {/* Simulated Hero Section */}
+                <div className="bg-gradient-to-b from-[#141424] to-[#0f0f1b] border border-indigo-500/30 rounded-xl p-5 flex flex-col items-center text-center gap-2.5 relative shadow-inner">
+                  <div className="w-24 h-4 bg-indigo-500/20 text-indigo-300 rounded-full text-[9px] font-semibold flex items-center justify-center border border-indigo-500/30">
+                    AI AUTOMATION
+                  </div>
+                  <div className="w-3/4 h-5 bg-white/20 rounded-md" />
+                  <div className="w-1/2 h-3 bg-white/10 rounded-md" />
+                  <div className="flex gap-2 mt-1">
+                    <div className="w-24 h-6 rounded-md bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center shadow">
+                      Launch Demo
+                    </div>
+                    <div className="w-20 h-6 rounded-md bg-white/5 border border-white/10 text-slate-300 text-[10px] font-medium flex items-center justify-center">
+                      Docs
+                    </div>
+                  </div>
+                </div>
+
+                {/* Simulated Feature Cards Grid */}
+                <div className="grid grid-cols-3 gap-2.5 flex-1">
+                  {[
+                    { title: "Fast CDN", color: "from-indigo-600/20 to-purple-600/10" },
+                    { title: "Custom CSS", color: "from-pink-600/20 to-rose-600/10" },
+                    { title: "Analytics", color: "from-cyan-600/20 to-blue-600/10" },
+                  ].map((card, i) => (
+                    <div
+                      key={i}
+                      className={`rounded-xl border border-white/[0.06] bg-gradient-to-br ${card.color} p-3 flex flex-col gap-1.5`}
+                    >
+                      <div className="w-5 h-5 rounded-md bg-white/10" />
+                      <div className="w-16 h-2.5 bg-white/25 rounded" />
+                      <div className="w-full h-1.5 bg-white/10 rounded" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right Properties Panel */}
+              <div className="hidden lg:flex w-48 shrink-0 bg-[#0c0c14] border-l border-white/[0.06] p-3.5 flex-col gap-3">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Inspector
+                </div>
+                <div className="flex flex-col gap-1 text-[11px] text-slate-300">
+                  <span className="text-[10px] text-slate-400">Layout</span>
+                  <div className="grid grid-cols-2 gap-1.5 bg-white/[0.03] p-1.5 rounded-lg border border-white/[0.05]">
+                    <span className="text-center font-mono text-[10px]">W: 100%</span>
+                    <span className="text-center font-mono text-[10px]">H: Auto</span>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1 text-[11px] text-slate-300">
+                  <span className="text-[10px] text-slate-400">Typography</span>
+                  <div className="h-6 bg-white/[0.03] rounded border border-white/[0.05] px-2 flex items-center text-[10px]">
+                    Inter Display (Bold)
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1 text-[11px] text-slate-300">
+                  <span className="text-[10px] text-slate-400">Background</span>
+                  <div className="h-6 bg-indigo-600/30 rounded border border-indigo-500/40 px-2 flex items-center justify-between text-[10px]">
+                    <span>#6366f1</span>
+                    <span className="w-3 h-3 rounded bg-indigo-500" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Features Section ── */}
+      <section className="py-24 px-6 lg:px-12 relative border-t border-white/[0.08]" id="features">
+        <div className="max-w-7xl mx-auto">
+          {/* Centered Section Header */}
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wider uppercase text-indigo-400 bg-indigo-500/10 border border-indigo-500/25 rounded-full px-3.5 py-1 mb-4">
+              Powerful Capabilities
+            </div>
+            <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
+              Everything you need to build<br />production-grade websites
+            </h2>
+            <p className="text-base text-slate-400 mt-4 leading-relaxed">
+              No compromises. No limits. Switch between visual building and customized components with complete design flexibility.
+            </p>
+          </div>
+
+          {/* Features Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {FEATURES.map((f) => (
+              <div
+                key={f.title}
+                className="group relative bg-[#0d0d15] hover:bg-[#11111c] border border-white/[0.08] hover:border-indigo-500/40 rounded-2xl p-7 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_15px_40px_rgba(0,0,0,0.6)]"
+              >
+                <div className="flex items-center justify-between mb-5">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-600/20 to-purple-600/20 border border-indigo-500/30 flex items-center justify-center text-xl text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.2)] group-hover:scale-110 transition-transform">
+                    {f.icon}
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-white/[0.04] px-2.5 py-1 rounded-full border border-white/[0.06]">
+                    {f.tag}
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2 group-hover:text-indigo-200 transition-colors">
+                  {f.title}
+                </h3>
+                <p className="text-sm text-slate-400 leading-relaxed">
+                  {f.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Templates Section ── */}
+      <section className="py-24 px-6 lg:px-12 bg-[#090910] border-t border-b border-white/[0.08] relative" id="templates">
+        <div className="max-w-7xl mx-auto">
+          {/* Centered Section Header */}
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wider uppercase text-indigo-400 bg-indigo-500/10 border border-indigo-500/25 rounded-full px-3.5 py-1 mb-4">
+              Curated Layouts
+            </div>
+            <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
+              Start from a real website,<br />not a blank page
+            </h2>
+            <p className="text-base text-slate-400 mt-4 leading-relaxed">
+              Every template is built with complete section architecture, custom colors, and component hierarchies.
+            </p>
+          </div>
+
+          {/* High-Fidelity Templates Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {TEMPLATES.map((t) => (
+              <div
+                key={t.name}
+                className="group rounded-2xl overflow-hidden border border-white/[0.1] hover:border-indigo-500/50 bg-[#0d0d17] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_50px_rgba(0,0,0,0.8)] cursor-pointer flex flex-col"
+              >
+                {/* Miniature Site Preview Canvas */}
+                <div className={`h-48 bg-gradient-to-br ${t.gradient} p-4 flex flex-col justify-between border-b border-white/[0.08] relative overflow-hidden`}>
+                  {/* Miniature Top Nav */}
+                  <div className="flex items-center justify-between pb-2 border-b border-white/[0.1]">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-3.5 h-3.5 rounded-full ${t.accent}`} />
+                      <span className="text-[11px] font-bold text-white tracking-wide">{t.name}</span>
+                    </div>
+                    <span className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-white/10 text-white border border-white/10">
+                      {t.pill}
+                    </span>
+                  </div>
+
+                  {/* Miniature Hero Section */}
+                  <div className="my-auto py-2 flex flex-col gap-2">
+                    <p className="text-xs font-semibold text-slate-200 line-clamp-2 leading-snug">
+                      "{t.headline}"
+                    </p>
+                    <div className="flex gap-2">
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold text-white ${t.accent} shadow-sm`}>
+                        Get Started
+                      </span>
+                      <span className="px-2 py-0.5 rounded text-[9px] font-medium text-slate-300 bg-white/10">
+                        View Demo
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Miniature 3-column feature row */}
+                  <div className="grid grid-cols-3 gap-1.5 pt-1">
+                    <div className="h-6 bg-white/[0.08] rounded border border-white/5" />
+                    <div className="h-6 bg-white/[0.08] rounded border border-white/5" />
+                    <div className="h-6 bg-white/[0.08] rounded border border-white/5" />
+                  </div>
+                </div>
+
+                {/* Card Footer Bar */}
+                <div className="p-4 bg-[#0a0a12] flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold tracking-wider uppercase block" style={{ color: t.color }}>
+                      {t.cat}
+                    </span>
+                    <h4 className="text-sm font-bold text-white mt-0.5">{t.name}</h4>
+                  </div>
+                  <Link
+                    to="/signup"
+                    className="text-xs font-bold text-indigo-400 group-hover:text-indigo-300 group-hover:translate-x-0.5 transition-all flex items-center gap-1"
+                    onClick={onGetStarted}
+                  >
+                    Use Template →
+                  </Link>
                 </div>
               </div>
             ))}
           </div>
-          <button className="lp-btn-outline lp-center-btn" onClick={onGetStarted}>Browse all templates</button>
+
+          {/* Bottom Action */}
+          <div className="flex justify-center mt-12">
+            <Link
+              to="/signup"
+              className="inline-flex items-center gap-2 bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 hover:border-indigo-500/40 text-slate-200 hover:text-white text-sm font-semibold px-7 py-3 rounded-xl transition cursor-pointer"
+              onClick={onGetStarted}
+            >
+              <span>Explore All 50+ Templates</span>
+              <span className="text-indigo-400">→</span>
+            </Link>
+          </div>
         </div>
       </section>
 
-      {/* ── How it works ── */}
-      <section className="lp-section" id="how">
-        <div className="lp-section-inner">
-          <div className="lp-section-label">How it works</div>
-          <h2 className="lp-section-title">From idea to live website<br />in four steps</h2>
-          <div className="lp-steps">
-            {STEPS.map(s => (
-              <div key={s.n} className="lp-step">
-                <div className="lp-step-num">{s.n}</div>
-                <h3>{s.title}</h3>
-                <p>{s.desc}</p>
+      {/* ── How It Works Section ── */}
+      <section className="py-24 px-6 lg:px-12 relative" id="how">
+        <div className="max-w-7xl mx-auto">
+          {/* Centered Section Header */}
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wider uppercase text-indigo-400 bg-indigo-500/10 border border-indigo-500/25 rounded-full px-3.5 py-1 mb-4">
+              Simple Workflow
+            </div>
+            <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
+              From initial idea to live website<br />in four simple steps
+            </h2>
+            <p className="text-base text-slate-400 mt-4 leading-relaxed">
+              No boilerplate code, no terminal commands, no hosting headaches.
+            </p>
+          </div>
+
+          {/* 4 Steps Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {STEPS.map((s) => (
+              <div
+                key={s.n}
+                className="bg-[#0d0d15] border border-white/[0.08] rounded-2xl p-6 flex flex-col gap-4 relative group hover:border-indigo-500/40 transition-all"
+              >
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-600/25 to-purple-600/20 border border-indigo-500/40 text-indigo-300 font-extrabold text-sm flex items-center justify-center shadow-[0_0_15px_rgba(99,102,241,0.2)]">
+                  {s.n}
+                </div>
+                <h3 className="text-base font-bold text-white leading-snug">
+                  {s.title}
+                </h3>
+                <p className="text-sm text-slate-400 leading-relaxed">
+                  {s.desc}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── CTA ── */}
-      <section className="lp-cta">
-        <div className="lp-cta-inner">
-          <h2>Ready to build something?</h2>
-          <p>Join thousands of creators, founders, and teams building with BuildX.</p>
-          <button className="lp-btn-primary lp-btn-lg" onClick={onGetStarted}>
-            Start building free
-            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd"/></svg>
-          </button>
+      {/* ── CTA Banner ── */}
+      <section className="py-20 px-6 lg:px-12 relative overflow-hidden">
+        <div className="max-w-5xl mx-auto rounded-3xl bg-gradient-to-b from-indigo-950/60 via-purple-950/40 to-slate-900/80 border border-indigo-500/30 p-12 md:p-16 text-center relative overflow-hidden shadow-[0_20px_80px_rgba(99,102,241,0.25)]">
+          {/* Ambient Glow */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-indigo-500/20 blur-[100px] rounded-full pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col items-center gap-6 max-w-xl mx-auto">
+            <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white">
+              Ready to build something extraordinary?
+            </h2>
+            <p className="text-base text-slate-300 leading-relaxed">
+              Join thousands of founders, creators, and developers shipping beautiful websites faster with BuildX.
+            </p>
+            <Link
+              to="/signup"
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold text-base px-9 py-4 rounded-xl shadow-[0_0_35px_rgba(99,102,241,0.5)] hover:shadow-[0_0_50px_rgba(99,102,241,0.7)] hover:-translate-y-0.5 transition-all cursor-pointer"
+              onClick={onGetStarted}
+            >
+              <span>Get Started Free</span>
+              <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </Link>
+          </div>
         </div>
       </section>
 
       {/* ── Footer ── */}
-      <footer className="lp-footer">
-        <div className="lp-footer-inner">
-          <div className="lp-logo">
-            <span className="lp-logo-mark">B</span>
-            <span className="lp-logo-text">BuildX</span>
+      <footer className="border-t border-white/[0.08] py-10 px-6 lg:px-12 bg-[#06060a]">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+          <Link to="/" className="flex items-center gap-3">
+            <span className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-xs text-white">
+              B
+            </span>
+            <span className="text-base font-bold text-white">BuildX</span>
+            <span className="text-xs text-slate-400 ml-2">Visual No-Code Platform</span>
+          </Link>
+
+          <div className="flex items-center gap-6 text-xs text-slate-400">
+            <a href="#features" className="hover:text-white transition">Features</a>
+            <a href="#templates" className="hover:text-white transition">Templates</a>
+            <a href="#how" className="hover:text-white transition">How It Works</a>
+            <Link to="/signin" className="hover:text-white transition">Sign In</Link>
+            <Link to="/signup" className="hover:text-white transition">Sign Up</Link>
           </div>
-          <p>© 2025 BuildX. Build websites without code.</p>
+
+          <p className="text-xs text-slate-400">
+            © 2026 BuildX. All rights reserved.
+          </p>
         </div>
       </footer>
     </div>

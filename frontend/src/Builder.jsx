@@ -1,127 +1,231 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import "./builder.css";
-
-const API = "http://localhost:5000/api/v1";
+import { API_BASE as API } from "./api.js";
+import { COMPONENT_GROUPS } from "./componentLibrary.js";
+import { useHistory } from "./hooks/useHistory.js";
 const GRID = 8;
 const snap = (v, step = GRID) => Math.round(v / step) * step;
 
-// ─── History (Undo/Redo) ───────────────────────────────────────────────────
-function useHistory(initial) {
-  const [index, setIndex] = useState(0);
-  const history = useRef([initial]);
-
-  const state = history.current[index];
-
-  const push = useCallback((next) => {
-    const newHistory = history.current.slice(0, index + 1);
-    newHistory.push(typeof next === "function" ? next(history.current[index]) : next);
-    history.current = newHistory;
-    setIndex(newHistory.length - 1);
-  }, [index]);
-
-  const undo = useCallback(() => setIndex(i => Math.max(0, i - 1)), []);
-  const redo = useCallback(() => setIndex(i => Math.min(history.current.length - 1, i + 1)), []);
-  const canUndo = index > 0;
-  const canRedo = index < history.current.length - 1;
-
-  return { state, push, undo, redo, canUndo, canRedo };
+function safeText(value, fallback = "") {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === "string") return value.trim() || fallback;
+  return String(value);
 }
 
-// ─── Component Library ────────────────────────────────────────────────────
-const COMPONENT_GROUPS = [
-  {
-    group: "Layout",
-    items: [
-      { type: "section",    label: "Section",     icon: "▬", defaultW: 800, defaultH: 200, props: { bg: "#f8fafc" } },
-      { type: "container",  label: "Container",   icon: "▭", defaultW: 400, defaultH: 120, props: { bg: "#ffffff" } },
-      { type: "columns",    label: "2 Columns",   icon: "⊟", defaultW: 600, defaultH: 120, props: { cols: 2 } },
-    ]
-  },
-  {
-    group: "Basic",
-    items: [
-      { type: "text",       label: "Text",        icon: "T",  defaultW: 300, defaultH: 40,  props: { text: "Your text here", fontSize: 16, color: "#1a1a1a" } },
-      { type: "heading",    label: "Heading",     icon: "H",  defaultW: 400, defaultH: 56,  props: { text: "Section Heading", fontSize: 32, fontWeight: "700", color: "#0f172a" } },
-      { type: "button",     label: "Button",      icon: "▶",  defaultW: 160, defaultH: 44,  props: { text: "Click me", bg: "#6366f1", color: "#ffffff", radius: 8 } },
-      { type: "divider",    label: "Divider",     icon: "─",  defaultW: 400, defaultH: 2,   props: { color: "#e2e8f0" } },
-      { type: "spacer",     label: "Spacer",      icon: "↕",  defaultW: 400, defaultH: 40,  props: {} },
-    ]
-  },
-  {
-    group: "Media",
-    items: [
-      { type: "image",      label: "Image",       icon: "🖼", defaultW: 320, defaultH: 220, props: { src: "", alt: "Image", fit: "cover" } },
-      {
-        type: "imagegrid",
-        label: "Image Grid",
-        icon: "▦",
-        defaultW: 660,
-        defaultH: 440,
-        props: {
-          cols: 3,
-          gap: 8,
-          aspectRatio: "1/1",
-          fit: "cover",
-          radius: 8,
-          hoverEffect: "zoom",
-          lightbox: false,
-          desktopCols: 3,
-          tabletCols: 2,
-          mobileCols: 1,
-          images: [
-            { src: "", alt: "Photo 1" },
-            { src: "", alt: "Photo 2" },
-            { src: "", alt: "Photo 3" },
-            { src: "", alt: "Photo 4" },
-            { src: "", alt: "Photo 5" },
-            { src: "", alt: "Photo 6" },
-          ],
-        },
-      },
-      { type: "video",      label: "Video",       icon: "▶",  defaultW: 480, defaultH: 270, props: { src: "", poster: "", controls: true } },
-    ]
-  },
-  {
-    group: "Navigation",
-    items: [
-      { type: "navbar",     label: "Navbar",      icon: "☰",  defaultW: 800, defaultH: 60,  props: { brand: "My Brand", links: "Home, About, Contact", bg: "#0f172a", color: "#f1f5f9" } },
-      { type: "footer",     label: "Footer",      icon: "▬",  defaultW: 800, defaultH: 80,  props: { text: "© 2025 My Company. All rights reserved.", bg: "#0f172a", color: "#94a3b8" } },
-    ]
-  },
-  {
-    group: "UI Components",
-    items: [
-      { type: "card",       label: "Card",        icon: "▣",  defaultW: 280, defaultH: 180, props: { title: "Card Title", body: "Card description goes here.", bg: "#ffffff", radius: 12 } },
-      { type: "badge",      label: "Badge",       icon: "◉",  defaultW: 100, defaultH: 28,  props: { text: "New", bg: "#6366f1", color: "#ffffff" } },
-      { type: "alert",      label: "Alert",       icon: "⚠",  defaultW: 400, defaultH: 56,  props: { text: "This is an alert message.", type: "info" } },
-      { type: "tabs",       label: "Tabs",        icon: "⊞",  defaultW: 500, defaultH: 44,  props: { tabs: "Tab 1, Tab 2, Tab 3" } },
-    ]
-  },
-  {
-    group: "Forms",
-    items: [
-      { type: "input",      label: "Input",       icon: "▭",  defaultW: 300, defaultH: 44,  props: { placeholder: "Enter text...", label: "Label" } },
-      { type: "textarea",   label: "Textarea",    icon: "▭",  defaultW: 300, defaultH: 100, props: { placeholder: "Enter message...", label: "Message" } },
-      { type: "select",     label: "Select",      icon: "▾",  defaultW: 200, defaultH: 44,  props: { label: "Choose option", options: "Option 1, Option 2, Option 3" } },
-      { type: "checkbox",   label: "Checkbox",    icon: "☑",  defaultW: 200, defaultH: 32,  props: { label: "I agree to terms" } },
-      { type: "loginform",  label: "Login Form",  icon: "🔐", defaultW: 420, defaultH: 320, props: { title: "Welcome back", subtitle: "Sign in to continue", emailLabel: "Email", passwordLabel: "Password", buttonText: "Login" } },
-      { type: "formblock",  label: "Form",        icon: "📋", defaultW: 400, defaultH: 280, props: { title: "Contact Us", cta: "Send Message" } },
-    ]
-  },
-  {
-    group: "Business",
-    items: [
-      { type: "hero",       label: "Hero Section",    icon: "★",  defaultW: 800, defaultH: 300, props: { heading: "Your Big Headline", subtext: "Supporting description text.", cta: "Get Started", bg: "#0f172a", color: "#f1f5f9" } },
-      { type: "productcard",label: "Product Card",    icon: "🛒", defaultW: 240, defaultH: 320, props: { name: "Product Name", price: "$99.99", brand: "Brand", rating: 4.5 } },
-      { type: "pricingcard",label: "Pricing Card",    icon: "💰", defaultW: 260, defaultH: 360, props: { plan: "Pro", price: "$49/mo", features: "Feature 1, Feature 2, Feature 3" } },
-      { type: "testimonial",label: "Testimonial",     icon: "💬", defaultW: 360, defaultH: 160, props: { quote: "This product changed everything for us.", author: "Jane Doe", role: "CEO, Acme Inc." } },
-      { type: "blogcard",   label: "Blog Card",       icon: "📰", defaultW: 300, defaultH: 240, props: { title: "Article Title", author: "Author Name", date: "June 2025", readTime: "5 min read", category: "Design" } },
-      { type: "statcard",   label: "Stat Card",       icon: "📊", defaultW: 180, defaultH: 100, props: { value: "12,400", label: "Monthly Users", trend: "+24%" } },
-    ]
-  },
-];
+function parseHexOrRgb(color) {
+  if (!color || typeof color !== "string") return null;
+  const trimmed = color.trim();
+  if (!trimmed) return null;
 
-const ALL_COMPONENTS = COMPONENT_GROUPS.flatMap(g => g.items);
+  if (trimmed.startsWith("#")) {
+    const hex = trimmed.length === 4
+      ? trimmed.split("").map(ch => ch + ch).join("").slice(1)
+      : trimmed.slice(1);
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null;
+    const num = Number.parseInt(hex, 16);
+    return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+  }
+
+  const rgbMatch = trimmed.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (rgbMatch) return [Number(rgbMatch[1]), Number(rgbMatch[2]), Number(rgbMatch[3])];
+
+  return null;
+}
+
+function getReadableTextColor(bgColor, darkFallback = "#0f172a", lightFallback = "#f8fafc") {
+  const rgb = parseHexOrRgb(bgColor);
+  if (!rgb) return darkFallback;
+  const [r, g, b] = rgb;
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.68 ? darkFallback : lightFallback;
+}
+
+function sanitizeComponentProps(type, props = {}) {
+  const next = { ...(props || {}) };
+  switch (type) {
+    case "text":
+      return {
+        ...next,
+        text: safeText(next.text, "Text"),
+        fontSize: Number.isFinite(Number(next.fontSize)) ? Number(next.fontSize) : 16,
+        color: safeText(next.color, getReadableTextColor(next.bg || "#ffffff", "#0f172a", "#f8fafc")),
+        fontWeight: next.fontWeight || "400",
+      };
+    case "heading":
+      return {
+        ...next,
+        text: safeText(next.text, "Heading"),
+        fontSize: Number.isFinite(Number(next.fontSize)) ? Number(next.fontSize) : 32,
+        color: safeText(next.color, getReadableTextColor(next.bg || "#ffffff", "#0f172a", "#f8fafc")),
+        fontWeight: next.fontWeight || "700",
+      };
+    case "button":
+      return {
+        ...next,
+        text: safeText(next.text, "Button"),
+        bg: safeText(next.bg, "#6366f1"),
+        color: safeText(next.color, "#ffffff"),
+        radius: Number.isFinite(Number(next.radius)) ? Number(next.radius) : 8,
+      };
+    case "navbar":
+      return {
+        ...next,
+        brand: safeText(next.brand, "Brand"),
+        links: next.links || "Home, About, Contact",
+        bg: safeText(next.bg, "#0f172a"),
+        color: safeText(next.color, getReadableTextColor(next.bg || "#0f172a", "#0f172a", "#f8fafc")),
+      };
+    case "footer":
+      return {
+        ...next,
+        text: safeText(next.text, "© 2026 Your Company. All rights reserved."),
+        bg: safeText(next.bg, "#0f172a"),
+        color: safeText(next.color, getReadableTextColor(next.bg || "#0f172a", "#0f172a", "#f8fafc")),
+      };
+    case "hero":
+      return {
+        ...next,
+        heading: safeText(next.heading, "Your Big Headline"),
+        subtext: safeText(next.subtext, "Supporting description text."),
+        cta: safeText(next.cta, "Get Started"),
+        bg: safeText(next.bg, "#0f172a"),
+        color: safeText(next.color, getReadableTextColor(next.bg || "#0f172a", "#0f172a", "#f8fafc")),
+      };
+    case "card":
+      return {
+        ...next,
+        title: safeText(next.title, "Card Title"),
+        body: safeText(next.body, "Card description goes here."),
+        bg: safeText(next.bg, "#ffffff"),
+        radius: Number.isFinite(Number(next.radius)) ? Number(next.radius) : 12,
+      };
+    case "badge":
+      return {
+        ...next,
+        text: safeText(next.text, "New"),
+        bg: safeText(next.bg, "#6366f1"),
+        color: safeText(next.color, "#ffffff"),
+      };
+    case "alert":
+      return {
+        ...next,
+        text: safeText(next.text, "This is an alert message."),
+        type: next.type || "info",
+      };
+    case "pricingcard":
+      return {
+        ...next,
+        plan: safeText(next.plan, "Pro"),
+        price: safeText(next.price, "$49/mo"),
+        features: safeText(next.features, "Feature 1, Feature 2, Feature 3"),
+      };
+    case "testimonial":
+      return {
+        ...next,
+        quote: safeText(next.quote, "This product changed everything for us."),
+        author: safeText(next.author, "Jane Doe"),
+        role: safeText(next.role, "CEO, Acme Inc."),
+      };
+    case "blogcard":
+      return {
+        ...next,
+        title: safeText(next.title, "Article Title"),
+        author: safeText(next.author, "Author Name"),
+        category: safeText(next.category, "Design"),
+        readTime: safeText(next.readTime, "5 min read"),
+      };
+    case "statcard":
+      return {
+        ...next,
+        value: safeText(next.value, "12,400"),
+        label: safeText(next.label, "Monthly Users"),
+        trend: safeText(next.trend, "+24%"),
+      };
+    case "formblock":
+      return {
+        ...next,
+        title: safeText(next.title, "Contact Us"),
+        cta: safeText(next.cta, "Send Message"),
+      };
+    case "loginform":
+      return {
+        ...next,
+        title: safeText(next.title, "Welcome back"),
+        subtitle: safeText(next.subtitle, "Sign in to continue"),
+        emailLabel: safeText(next.emailLabel, "Email"),
+        passwordLabel: safeText(next.passwordLabel, "Password"),
+        buttonText: safeText(next.buttonText, "Login"),
+      };
+    case "input":
+    case "textarea":
+      return {
+        ...next,
+        label: safeText(next.label, "Label"),
+        placeholder: safeText(next.placeholder, type === "textarea" ? "Enter message..." : "Enter text..."),
+      };
+    case "select":
+      return {
+        ...next,
+        label: safeText(next.label, "Choose option"),
+        options: safeText(next.options, "Option 1, Option 2, Option 3"),
+      };
+    case "checkbox":
+      return {
+        ...next,
+        label: safeText(next.label, "I agree to terms"),
+      };
+    case "section":
+    case "container":
+    case "columns":
+      return {
+        ...next,
+        bg: safeText(next.bg, type === "section" ? "#f8fafc" : type === "container" ? "#ffffff" : "#f8fafc"),
+      };
+    default:
+      return next;
+  }
+}
+
+function serializeNodeForStorage(node) {
+  const safeType = ["button","input","textarea","text","heading","image","imagegrid","video","container","section","columns","formblock","navbar","footer","hero","card","badge","alert","tabs","productcard","pricingcard","testimonial","blogcard","statcard","divider","spacer","select","checkbox"].includes(node?.type) ? node.type : "container";
+
+  return {
+    id: node?.id || `node-${Date.now()}`,
+    type: safeType,
+    parentId: node?.parentId || null,
+    properties: sanitizeComponentProps(safeType, node?.props || {}),
+    position: {
+      x: Number.isFinite(Number(node?.x)) ? Number(node.x) : 0,
+      y: Number.isFinite(Number(node?.y)) ? Number(node.y) : 0,
+    },
+    styles: {
+      width: Number.isFinite(Number(node?.w)) ? Number(node.w) : 280,
+      height: Number.isFinite(Number(node?.h)) ? Number(node.h) : 60,
+    },
+  };
+}
+
+function restoreNodeFromProject(component, index = 0) {
+  const type = component?.type || "container";
+  return {
+    id: component?.id || `node-${index}`,
+    type,
+    x: Number.isFinite(Number(component?.position?.x)) ? Number(component.position.x) : index * 20,
+    y: Number.isFinite(Number(component?.position?.y)) ? Number(component.position.y) : index * 60,
+    w: Number.isFinite(Number(component?.styles?.width)) ? Number(component.styles.width) : 280,
+    h: Number.isFinite(Number(component?.styles?.height)) ? Number(component.styles.height) : 60,
+    props: sanitizeComponentProps(type, component?.properties || {}),
+    parentId: component?.parentId || null,
+    locked: false,
+    hidden: false,
+    name: component?.properties?.text || component?.properties?.heading || component?.properties?.title || component?.properties?.brand || component?.type || "Component",
+  };
+}
+
+// ─── History (Undo/Redo) — see hooks/useHistory.js ──────────────────────────
+
+// ─── Component Library — see componentLibrary.js ─────────────────────────────
 
 // ─── Snap helpers ─────────────────────────────────────────────────────────
 const SNAP_THRESHOLD = 6;
@@ -168,21 +272,23 @@ function normalizeList(value, fallback = []) {
   return Array.isArray(fallback) ? fallback.map(String).map(v => v.trim()).filter(Boolean) : [];
 }
 
-function renderNodeContent(node, updateNode, isPreview = false) {
-  const p = node.props || {};
+function renderNodeContent(node, updateNode, isPreview = false, allNodes = []) {
+  const p = sanitizeComponentProps(node.type, node.props || {});
   const handleTextChange = (newText) => {
     if (newText !== p.text) {
       const updated = { ...node, props: { ...p, text: newText } };
       updateNode(updated);
     }
   };
+  const childNodes = (allNodes || []).filter(n => n.parentId === node.id && !n.hidden);
+
   switch (node.type) {
     case "text":
       return (
         <span
           contentEditable
           suppressContentEditableWarning
-          style={{ fontSize: p.fontSize || 16, color: p.color || "#1a1a1a", fontWeight: p.fontWeight || "400", lineHeight: 1.5, outline: "none", cursor: "text", userSelect: "text", display: "block", width: "100%", minHeight: 20 }}
+          style={{ fontSize: p.fontSize || 16, color: p.color || "#0f172a", fontWeight: p.fontWeight || "400", lineHeight: 1.5, outline: "none", cursor: "text", userSelect: "text", display: "block", width: "100%", minHeight: 20 }}
           onPointerDown={e => e.stopPropagation()}
           onBlur={e => handleTextChange(e.target.innerText)}
         >{p.text || "Text"}</span>
@@ -198,12 +304,11 @@ function renderNodeContent(node, updateNode, isPreview = false) {
         >{p.text || "Heading"}</span>
       );
     case "button":
-      // Make button label directly editable on the canvas.
       return (
         <button
           contentEditable
           suppressContentEditableWarning
-          style={{ background: p.bg || "#6366f1", color: p.color || "#fff", border: "none", borderRadius: p.radius || 8, padding: "0 20px", height: "100%", width: "100%", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
+          style={{ background: p.bg || "#6366f1", color: p.color || "#ffffff", border: "none", borderRadius: p.radius || 8, padding: "0 20px", height: "100%", width: "100%", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
           onBlur={e => {
             const newText = e.target.innerText;
             if (newText !== p.text) {
@@ -280,8 +385,8 @@ function renderNodeContent(node, updateNode, isPreview = false) {
     case "navbar": {
       const links = normalizeList(p.links, ["Home", "About", "Contact"]);
       return (
-        <div style={{ background: p.bg || "#0f172a", color: p.color || "#f1f5f9", width: "100%", height: "100%", display: "flex", alignItems: "center", padding: "0 20px", gap: 24, fontSize: 14, fontWeight: 600 }}>
-          <span style={{ fontWeight: 800, fontSize: 16 }}>{p.brand || "Brand"}</span>
+        <div style={{ background: p.bg || "#0f172a", color: p.color || getReadableTextColor(p.bg || "#0f172a", "#0f172a", "#f8fafc"), width: "100%", height: "100%", display: "flex", alignItems: "center", padding: "0 20px", gap: 24, fontSize: 14, fontWeight: 600 }}>
+          <span style={{ fontWeight: 800, fontSize: 16 }}>{safeText(p.brand, "Brand")}</span>
           <div style={{ display: "flex", gap: 18, alignItems: "center", opacity: 0.8, fontSize: 12 }}>
             {links.map((link, index) => <span key={`${link}-${index}`}>{link}</span>)}
           </div>
@@ -289,15 +394,31 @@ function renderNodeContent(node, updateNode, isPreview = false) {
       );
     }
     case "footer":
-      return <div style={{ background: p.bg || "#0f172a", color: p.color || "#94a3b8", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>{p.text || "Footer"}</div>;
+      return <div style={{ background: p.bg || "#0f172a", color: p.color || getReadableTextColor(p.bg || "#0f172a", "#0f172a", "#f8fafc"), width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>{safeText(p.text, "© 2026 Your Company. All rights reserved.")}</div>;
     case "hero":
       return <div style={{ background: p.bg || "#0f172a", color: p.color || "#f1f5f9", width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px", textAlign: "center", gap: 10 }}><div style={{ fontSize: Math.min(28, (p.fontSize || 36)), fontWeight: 800, lineHeight: 1.2 }}>{p.heading || "Hero Heading"}</div><div style={{ fontSize: 13, opacity: 0.7, maxWidth: 400 }}>{p.subtext || "Subtext"}</div><button style={{ marginTop: 8, background: "#6366f1", color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{p.cta || "Get Started"}</button></div>;
     case "card":
       return <div style={{ background: p.bg || "#ffffff", width: "100%", height: "100%", borderRadius: p.radius || 12, padding: "16px", display: "flex", flexDirection: "column", gap: 6, border: "1px solid #e2e8f0" }}><div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>{p.title || "Card Title"}</div><div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>{p.body || "Card description."}</div></div>;
     case "section":
-      return <div style={{ background: p.bg || "#f8fafc", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>Section</span></div>;
+      return (
+        <div style={{ background: p.bg || "#f8fafc", width: "100%", height: "100%", border: "1px dashed #cbd5e1", borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 10, overflow: "hidden" }}>
+          {childNodes.length > 0 ? childNodes.map((child) => (
+            <div key={child.id} style={{ position: "relative", minHeight: 24 }}>
+              {renderNodeContent(child, updateNode, isPreview, allNodes)}
+            </div>
+          )) : <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>Section</span>}
+        </div>
+      );
     case "container":
-      return <div style={{ background: p.bg || "#ffffff", width: "100%", height: "100%", border: "1px dashed #cbd5e1", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 11, color: "#94a3b8" }}>Container</span></div>;
+      return (
+        <div style={{ background: p.bg || "#ffffff", width: "100%", height: "100%", border: "1px dashed #cbd5e1", borderRadius: 6, padding: 10, display: "flex", flexDirection: "column", gap: 8, overflow: "hidden" }}>
+          {childNodes.length > 0 ? childNodes.map((child) => (
+            <div key={child.id} style={{ position: "relative", minHeight: 24 }}>
+              {renderNodeContent(child, updateNode, isPreview, allNodes)}
+            </div>
+          )) : <span style={{ fontSize: 11, color: "#94a3b8" }}>Container</span>}
+        </div>
+      );
     case "divider":
       return <div style={{ width: "100%", height: "100%", background: p.color || "#e2e8f0", borderRadius: 2 }} />;
     case "spacer":
@@ -441,8 +562,19 @@ function renderNodeContent(node, updateNode, isPreview = false) {
       return <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}><div style={{ flex: 1, background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#94a3b8" }}>Cover Image</div><div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 4 }}><div style={{ fontSize: 10, color: "#6366f1", fontWeight: 700, textTransform: "uppercase" }}>{p.category || "Category"}</div><div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", lineHeight: 1.3 }}>{p.title || "Article Title"}</div><div style={{ fontSize: 11, color: "#94a3b8" }}>{p.author || "Author"} · {p.readTime || "5 min"}</div></div></div>;
     case "statcard":
       return <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, width: "100%", height: "100%", padding: "16px", display: "flex", flexDirection: "column", justifyContent: "center" }}><div style={{ fontSize: 26, fontWeight: 800, color: "#0f172a" }}>{p.value || "0"}</div><div style={{ fontSize: 12, color: "#64748b" }}>{p.label || "Metric"}</div>{p.trend && <div style={{ fontSize: 11, color: "#22c55e", fontWeight: 600 }}>{p.trend}</div>}</div>;
-    case "columns":
-      return <div style={{ display: "flex", gap: 8, width: "100%", height: "100%", padding: 4 }}>{Array.from({ length: p.cols || 2 }).map((_, i) => <div key={i} style={{ flex: 1, background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#94a3b8" }}>Col {i + 1}</div>)}</div>;
+    case "columns": {
+      const columnCount = Math.max(1, Number(p.cols || 2));
+      const columnChildren = childNodes.length > 0 ? childNodes : Array.from({ length: columnCount }, (_, i) => ({ id: `${node.id}-col-${i}`, type: "container", parentId: node.id, props: { bg: "#f8fafc" } }));
+      return (
+        <div style={{ display: "flex", gap: 8, width: "100%", height: "100%", padding: 4 }}>
+          {columnChildren.map((child, index) => (
+            <div key={child.id || `${node.id}-col-${index}`} style={{ flex: 1, background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: 6, padding: 8, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              {child.type === "container" || child.type === "section" || child.type === "text" || child.type === "heading" || child.type === "button" ? renderNodeContent({ ...child, props: sanitizeComponentProps(child.type, child.props || {}) }, updateNode, isPreview, allNodes) : <span style={{ fontSize: 11, color: "#94a3b8" }}>Col {index + 1}</span>}
+            </div>
+          ))}
+        </div>
+      );
+    }
     default:
       return <span style={{ fontSize: 12, color: "#94a3b8", padding: "0 8px" }}>{node.type}</span>;
   }
@@ -760,7 +892,17 @@ function PropertiesPanel({ node, onChange, onDelete, onDuplicate }) {
 }
 
 // ─── Main Builder ─────────────────────────────────────────────────────────
-export default function Builder({ token, projectId, onBack }) {
+export default function Builder({ token: propToken, projectId: propProjectId, onBack }) {
+  const { projectId: routeProjectId } = useParams();
+  const navigate = useNavigate();
+  const projectId = propProjectId || routeProjectId || null;
+  const token = propToken || localStorage.getItem("token") || "";
+
+  const handleBack = () => {
+    if (onBack) onBack();
+    navigate("/dashboard");
+  };
+
   const draftKey = projectId ? `buildx-draft-${projectId}` : "buildx-draft-new";
   const getSavedDraft = () => {
     try {
@@ -778,12 +920,18 @@ export default function Builder({ token, projectId, onBack }) {
   };
 
   const initialDraft = getSavedDraft();
-  const { state: nodes, push, undo, redo, canUndo, canRedo } = useHistory(initialDraft.nodes);
+  const { state: nodes = [], push, undo, redo, canUndo, canRedo } = useHistory(initialDraft?.nodes || []);
   const [selected, setSelected] = useState(null); // single id
   const [multiSelected, setMultiSelected] = useState([]); // array of ids
   const [guides, setGuides] = useState([]);
-  const [showGrid, setShowGrid] = useState(true);
+  const [showGrid, setShowGrid] = useState(false);
+  const [gridType, setGridType] = useState("columns");
+  const [gridColumns, setGridColumns] = useState(12);
+  const [gridRows, setGridRows] = useState(8);
+  const [gridSquareCount, setGridSquareCount] = useState(8);
   const [gridSize, setGridSize] = useState(8);
+  const [gridGap, setGridGap] = useState(24);
+  const [gridMargin, setGridMargin] = useState(40);
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [showGuides, setShowGuides] = useState(true);
   const [zoom, setZoom] = useState(1);
@@ -818,12 +966,12 @@ export default function Builder({ token, projectId, onBack }) {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const selectedNode = nodes.find(n => n.id === selected);
-  const snapValue = useCallback((value) => {
-    if (!Number.isFinite(value)) return 0;
-    if (!snapToGrid || (!gridSize && gridSize !== 0)) return value;
-    return Math.round(value / gridSize) * gridSize;
-  }, [gridSize, snapToGrid]);
+  const selectedNode = (nodes || []).find(n => n.id === selected);
+  const gridSnapStep = gridType === "columns"
+    ? Math.max(1, (1200 - (gridMargin * 2) + gridGap) / Math.max(1, gridColumns))
+    : gridType === "square"
+      ? Math.max(1, (1200 - (gridMargin * 2) + ((gridSquareCount - 1) * gridGap)) / Math.max(1, gridSquareCount))
+      : Math.max(1, (800 - (gridMargin * 2) + ((gridRows - 1) * gridGap)) / Math.max(1, gridRows));
 
   useEffect(() => {
     try {
@@ -866,42 +1014,20 @@ export default function Builder({ token, projectId, onBack }) {
         if (data.success) {
           const p = data.payload.project;
           setProjectName(p.name);
-          const mapped = (p.components || []).map((c, i) => ({
-            id: c.id || `node-${i}`,
-            type: c.type,
-            x: c.position?.x ?? i * 20,
-            y: c.position?.y ?? i * 60,
-            w: c.styles?.width ?? 280,
-            h: c.styles?.height ?? 60,
-            props: c.properties || {},
-            locked: false,
-            hidden: false,
-            name: c.properties?.text || c.properties?.heading || c.properties?.title || c.type,
-          }));
+          const mapped = (p.components || []).map((c, i) => restoreNodeFromProject(c, i));
 
           const projectPages = Array.isArray(p.settings?.pages) && p.settings.pages.length
             ? p.settings.pages.map((page, index) => ({
                 id: page.id || `page-${index + 1}`,
                 name: page.name || `Page ${index + 1}`,
-                components: Array.isArray(page.components) ? page.components.map((c, j) => ({
-                  id: c.id || `node-${index}-${j}`,
-                  type: c.type,
-                  x: c.position?.x ?? j * 20,
-                  y: c.position?.y ?? j * 60,
-                  w: c.styles?.width ?? 280,
-                  h: c.styles?.height ?? 60,
-                  props: c.properties || {},
-                  locked: false,
-                  hidden: false,
-                  name: c.properties?.text || c.properties?.heading || c.properties?.title || c.type,
-                })) : [],
+                components: Array.isArray(page.components) ? page.components.map((c, j) => restoreNodeFromProject(c, j)) : [],
               }))
             : [{ id: "page-1", name: "Home", components: mapped }];
 
           const savedDraft = getSavedDraft();
           const draftNodes = Array.isArray(savedDraft.nodes) ? savedDraft.nodes : [];
           const lastSavedAt = Number(p.updatedAt ? new Date(p.updatedAt).getTime() : 0);
-          const shouldUseDraft = draftNodes.length > 0 && savedDraft.projectId === projectId && savedDraft.updatedAt > lastSavedAt;
+          const shouldUseDraft = draftNodes.length > 0 && savedDraft.projectId === projectId && Number(savedDraft.updatedAt || 0) > lastSavedAt;
           const initialNodes = shouldUseDraft ? draftNodes : projectPages[0].components;
           const initialPageId = projectPages[0].id;
 
@@ -929,6 +1055,21 @@ export default function Builder({ token, projectId, onBack }) {
     load();
   }, [projectId]);
 
+  const deleteSelected = useCallback(() => {
+    if (!selected) return;
+    push(prev => prev.filter(n => n.id !== selected));
+    setSelected(null);
+  }, [selected, push]);
+
+  const duplicateSelected = useCallback(() => {
+    if (!selected) return;
+    const orig = (nodes || []).find(n => n.id === selected);
+    if (!orig) return;
+    const copy = { ...orig, id: `${orig.type}-${Date.now()}`, x: orig.x + 24, y: orig.y + 24, props: { ...orig.props } };
+    push(prev => [...prev, copy]);
+    setSelected(copy.id);
+  }, [selected, nodes, push]);
+
   // ── Keyboard shortcuts ──
   useEffect(() => {
     const onKey = (e) => {
@@ -952,14 +1093,14 @@ export default function Builder({ token, projectId, onBack }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selected, nodes, undo, redo]);
+  }, [selected, nodes, undo, redo, deleteSelected, duplicateSelected, push]);
 
   // ── Drag to move/resize ──
   const startDrag = useCallback((e, id, mode = "move") => {
     if (isPreview) return;
     e.preventDefault();
     e.stopPropagation();
-    const node = nodes.find(n => n.id === id);
+    const node = (nodes || []).find(n => n.id === id);
     if (!node || node.locked) return;
     setSelected(id);
     dragState.current = {
@@ -979,15 +1120,16 @@ export default function Builder({ token, projectId, onBack }) {
           const rawX = Math.max(0, origX + dx);
           const rawY = Math.max(0, origY + dy);
           const others = prev.filter(o => o.id !== id);
-          const { sx, sy, guides: g } = getSnapGuides(rawX, rawY, n.w, n.h, others, showGuides ? gridSize : GRID);
+          const { sx, sy, guides: g } = getSnapGuides(rawX, rawY, n.w, n.h, others, gridSnapStep);
           setGuides(g);
-          return { ...n, x: sx, y: sy };
+          return { ...n, x: snapToGrid ? sx : rawX, y: snapToGrid ? sy : rawY };
         }
         let { x, y, w, h } = { x: origX, y: origY, w: origW, h: origH };
-        if (mode.includes("e"))  w = snap(Math.max(20, origW + dx));
-        if (mode.includes("s"))  h = snap(Math.max(8,  origH + dy));
-        if (mode.includes("w")) { w = snap(Math.max(20, origW - dx)); x = snap(origX + origW - w); }
-        if (mode.includes("n")) { h = snap(Math.max(8,  origH - dy)); y = snap(origY + origH - h); }
+        const resizeSnap = value => snapToGrid ? snap(value, gridSnapStep) : value;
+        if (mode.includes("e"))  w = resizeSnap(Math.max(20, origW + dx));
+        if (mode.includes("s"))  h = resizeSnap(Math.max(8,  origH + dy));
+        if (mode.includes("w")) { w = resizeSnap(Math.max(20, origW - dx)); x = resizeSnap(origX + origW - w); }
+        if (mode.includes("n")) { h = resizeSnap(Math.max(8, origH - dy)); y = resizeSnap(origY + origH - h); }
         return { ...n, x, y, w, h };
       }));
     };
@@ -999,7 +1141,7 @@ export default function Builder({ token, projectId, onBack }) {
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
-  }, [nodes, zoom, isPreview, push, snapToGrid, gridSize, showGuides]);
+  }, [nodes, zoom, isPreview, push, snapToGrid, gridSnapStep]);
 
   // ── Drop from sidebar ──
   const handleDrop = (e) => {
@@ -1009,36 +1151,32 @@ export default function Builder({ token, projectId, onBack }) {
     if (!raw) return;
     const def = JSON.parse(raw);
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = snap(Math.max(0, (e.clientX - rect.left) / zoom - def.defaultW / 2), snapToGrid ? gridSize : GRID);
-    const y = snap(Math.max(0, (e.clientY - rect.top) / zoom - def.defaultH / 2), snapToGrid ? gridSize : GRID);
+    const x = snap(Math.max(0, (e.clientX - rect.left) / zoom - def.defaultW / 2), snapToGrid ? gridSnapStep : 1);
+    const y = snap(Math.max(0, (e.clientY - rect.top) / zoom - def.defaultH / 2), snapToGrid ? gridSnapStep : 1);
+    let parentId = null;
+    const parentNode = (nodes || []).find((node) => {
+      if (node.type !== "section" && node.type !== "container" && node.type !== "columns") return false;
+      return x >= node.x && y >= node.y && x + def.defaultW <= node.x + node.w && y + def.defaultH <= node.y + node.h;
+    });
+    if (parentNode) {
+      parentId = parentNode.id;
+    }
+
     const newNode = {
       id: `${def.type}-${Date.now()}`,
       type: def.type,
-      x, y,
+      x: parentNode ? 12 : x,
+      y: parentNode ? 12 : y,
       w: def.defaultW,
       h: def.defaultH,
-      props: { ...def.props },
+      props: sanitizeComponentProps(def.type, def.props),
+      parentId,
       locked: false,
       hidden: false,
       name: def.label,
     };
     push(prev => [...prev, newNode]);
     setSelected(newNode.id);
-  };
-
-  const deleteSelected = () => {
-    if (!selected) return;
-    push(prev => prev.filter(n => n.id !== selected));
-    setSelected(null);
-  };
-
-  const duplicateSelected = () => {
-    if (!selected) return;
-    const orig = nodes.find(n => n.id === selected);
-    if (!orig) return;
-    const copy = { ...orig, id: `${orig.type}-${Date.now()}`, x: orig.x + 24, y: orig.y + 24, props: { ...orig.props } };
-    push(prev => [...prev, copy]);
-    setSelected(copy.id);
   };
 
   const updateNode = (updated) => {
@@ -1084,7 +1222,7 @@ export default function Builder({ token, projectId, onBack }) {
   };
 
   const switchPage = (pageId) => {
-    const target = pages.find((page) => page.id === pageId);
+    const target = (pages || []).find((page) => page.id === pageId);
     if (!target) return;
     setCurrentPageId(pageId);
     push(target.components || []);
@@ -1135,7 +1273,8 @@ export default function Builder({ token, projectId, onBack }) {
           y: Number.isFinite(Number(c.position?.y)) ? snap(Number(c.position.y)) : 40 + Math.floor(i / 3) * 120,
           w: Number(c.styles?.width) || defaultW,
           h: Number(c.styles?.height) || defaultH,
-          props: c.properties || {},
+          props: sanitizeComponentProps(baseType, c.properties || {}),
+          parentId: c.parentId || null,
           locked: false,
           hidden: false,
           name: c.properties?.heading || c.properties?.title || c.properties?.text || baseType,
@@ -1159,18 +1298,12 @@ export default function Builder({ token, projectId, onBack }) {
     setSaving(true);
     try {
       const ALLOWED = ["button","input","textarea","text","heading","image","imagegrid","video","container","section","columns","formblock","navbar","footer","hero","card","badge","alert","tabs","productcard","pricingcard","testimonial","blogcard","statcard","divider","spacer","select","checkbox"];
-      const comps = nodes.map(n => ({
-        id: n.id,
-        type: ALLOWED.includes(n.type) ? n.type : "container",
-        properties: n.props || {},
-        position: { x: n.x || 0, y: n.y || 0 },
-        styles: { width: n.w, height: n.h },
-      }));
+      const comps = nodes.map((n) => serializeNodeForStorage(n));
       const serializedPages = pages.length
         ? pages.map((page) => ({
             id: page.id,
             name: page.name || "Page",
-            components: page.components || [],
+            components: (page.components || []).map((component) => serializeNodeForStorage(component)),
           }))
         : [{ id: currentPageId || "page-1", name: "Home", components: comps }];
 
@@ -1206,7 +1339,7 @@ export default function Builder({ token, projectId, onBack }) {
           localStorage.removeItem("buildx-draft-new");
         }
         showToast(isUpdate ? "Project saved!" : "Project created!");
-        setTimeout(() => onBack(), 1200);
+        setTimeout(() => handleBack(), 1200);
       } else {
         showToast(data.message || "Save failed", "error");
       }
@@ -1223,13 +1356,7 @@ export default function Builder({ token, projectId, onBack }) {
 
     try {
       const ALLOWED = ["button","input","textarea","text","heading","image","imagegrid","video","container","section","columns","formblock","navbar","footer","hero","card","badge","alert","tabs","productcard","pricingcard","testimonial","blogcard","statcard","divider","spacer","select","checkbox"];
-      const comps = nodes.map(n => ({
-        id: n.id,
-        type: ALLOWED.includes(n.type) ? n.type : "container",
-        properties: n.props || {},
-        position: { x: n.x || 0, y: n.y || 0 },
-        styles: { width: n.w, height: n.h },
-      }));
+      const comps = nodes.map((n) => serializeNodeForStorage(n));
 
       let projId = currentProjectId;
       if (!projId) {
@@ -1301,7 +1428,7 @@ export default function Builder({ token, projectId, onBack }) {
     );
   }
 
-  const visibleNodes = nodes.filter(n => !n.hidden);
+  const visibleNodes = nodes.filter(n => !n.hidden && !n.parentId);
   const activeIds = multiSelected.length > 1 ? multiSelected : (selected ? [selected] : []);
 
   return (
@@ -1311,7 +1438,7 @@ export default function Builder({ token, projectId, onBack }) {
       {/* ── Top Bar ── */}
       <header className="bx-topbar">
         <div className="bx-topbar-left">
-          <button className="bx-back-btn" onClick={onBack} title="Back to Dashboard">
+          <button className="bx-back-btn" onClick={handleBack} title="Back to Dashboard">
             <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd"/></svg>
           </button>
           <div className="bx-brand-mark">B</div>
@@ -1399,25 +1526,37 @@ export default function Builder({ token, projectId, onBack }) {
                 </label>
               </div>
               <div className="bx-grid-controls-row">
-                <button className={gridSize === 5 ? "active" : ""} onClick={() => setGridSize(5)}>5 × 5</button>
-                <button className={gridSize === 10 ? "active" : ""} onClick={() => setGridSize(10)}>10 × 10</button>
+                {[["square", "Square"], ["columns", "Columns"], ["rows", "Rows"]].map(([type, label]) => (
+                  <button key={type} className={gridType === type ? "active" : ""} onClick={() => setGridType(type)}>{label}</button>
+                ))}
+              </div>
+              <div className="bx-grid-controls-row bx-grid-presets">
+                <button className={gridType === "square" && gridSquareCount === 5 ? "active" : ""} onClick={() => { setGridType("square"); setGridSquareCount(5); }}>5 × 5</button>
+                <button className={gridType === "square" && gridSquareCount === 8 ? "active" : ""} onClick={() => { setGridType("square"); setGridSquareCount(8); }}>8 × 8</button>
+                <button className={gridType === "columns" && gridColumns === 12 ? "active" : ""} onClick={() => { setGridType("columns"); setGridColumns(12); }}>12 columns</button>
               </div>
               <div className="bx-grid-controls-row custom-row">
-                <label htmlFor="custom-grid-size">Custom</label>
+                <label htmlFor="custom-grid-size">Cell size</label>
                 <input
                   id="custom-grid-size"
                   type="number"
                   min="4"
-                  max="40"
+                  max="160"
                   step="1"
                   value={gridSize}
                   onChange={(e) => {
                     const next = Number(e.target.value);
-                    if (Number.isFinite(next) && next >= 4 && next <= 40) {
+                    if (Number.isFinite(next) && next >= 4 && next <= 160) {
                       setGridSize(next);
                     }
                   }}
                 />
+              </div>
+              <div className="bx-grid-settings">
+                <label>Columns <input type="number" min="2" max="24" value={gridColumns} onChange={e => setGridColumns(Math.min(24, Math.max(2, Number(e.target.value) || 2)))} /></label>
+                <label>Rows <input type="number" min="2" max="40" value={gridRows} onChange={e => setGridRows(Math.min(40, Math.max(2, Number(e.target.value) || 2)))} /></label>
+                <label>Gap <input type="number" min="0" max="120" value={gridGap} onChange={e => setGridGap(Math.min(120, Math.max(0, Number(e.target.value) || 0)))} /></label>
+                <label>Margin <input type="number" min="0" max="240" value={gridMargin} onChange={e => setGridMargin(Math.min(240, Math.max(0, Number(e.target.value) || 0)))} /></label>
               </div>
               <label className="bx-toggle">
                 <input type="checkbox" checked={showGuides} onChange={() => setShowGuides(v => !v)} />
@@ -1535,12 +1674,24 @@ export default function Builder({ token, projectId, onBack }) {
             onDragLeave={!isPreview ? () => setDragOver(false) : undefined}
             onPointerDown={!isPreview ? e => { if (e.target === canvasRef.current) { setSelected(null); setMultiSelected([]); } } : undefined}
           >
-            {/* Grid dots */}
+            {/* Editor-only layout grid. It is never part of a saved node or preview. */}
             {!isPreview && showGrid && (
-              <svg className="bx-grid" aria-hidden="true">
-                <defs><pattern id="bxgrid" width={gridSize * 4} height={gridSize * 4} patternUnits="userSpaceOnUse"><circle cx="0.5" cy="0.5" r="0.5" fill="#1e1e2e"/></pattern></defs>
-                <rect width="100%" height="100%" fill="url(#bxgrid)" />
-              </svg>
+              <div
+                className={`bx-grid bx-grid-${gridType}`}
+                aria-hidden="true"
+                style={{
+                  left: gridMargin,
+                  right: gridMargin,
+                  top: gridMargin,
+                  bottom: gridMargin,
+                  backgroundSize: gridType === "square" ? `calc((100% - ${(gridSquareCount - 1) * gridGap}px) / ${gridSquareCount}) calc((100% - ${(gridSquareCount - 1) * gridGap}px) / ${gridSquareCount})` : undefined,
+                  backgroundImage: gridType === "square"
+                    ? "linear-gradient(to right, rgba(99,102,241,.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(99,102,241,.12) 1px, transparent 1px)"
+                    : gridType === "columns"
+                      ? `repeating-linear-gradient(to right, transparent 0, transparent calc((100% - ${(gridColumns - 1) * gridGap}px) / ${gridColumns} - 1px), rgba(99,102,241,.18) calc((100% - ${(gridColumns - 1) * gridGap}px) / ${gridColumns} - 1px), rgba(99,102,241,.18) calc((100% - ${(gridColumns - 1) * gridGap}px) / ${gridColumns}), transparent calc((100% - ${(gridColumns - 1) * gridGap}px) / ${gridColumns} + ${gridGap}px))`
+                      : `repeating-linear-gradient(to bottom, transparent 0, transparent calc((100% - ${(gridRows - 1) * gridGap}px) / ${gridRows} - 1px), rgba(99,102,241,.16) calc((100% - ${(gridRows - 1) * gridGap}px) / ${gridRows} - 1px), rgba(99,102,241,.16) calc((100% - ${(gridRows - 1) * gridGap}px) / ${gridRows}), transparent calc((100% - ${(gridRows - 1) * gridGap}px) / ${gridRows} + ${gridGap}px))`,
+                }}
+              />
             )}
 
             {/* Snap guides */}
@@ -1582,7 +1733,7 @@ export default function Builder({ token, projectId, onBack }) {
                     }
                   }}
                 >
-                  {renderNodeContent(node, updateNode)}
+                  {renderNodeContent(node, updateNode, false, nodes)}
 
                   {/* Selection handles */}
                   {isSel && !isPreview && !node.locked && (
@@ -1626,40 +1777,40 @@ export default function Builder({ token, projectId, onBack }) {
 
       {/* ── Publish / Deployment Modal ── */}
       {publishModalOpen && (
-        <div className="bx-modal-overlay" onClick={() => setPublishModalOpen(false)}>
-          <div className="bx-modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="bx-modal-header">
-              <h3>Publish Website</h3>
-              <button className="bx-modal-close-btn" onClick={() => setPublishModalOpen(false)}>✕</button>
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-[9999] p-4 animate-[bx-fade-in_0.2s_ease-out]" onClick={() => setPublishModalOpen(false)}>
+          <div className="bg-bx-bg-elevated border border-bx-border-mid rounded-2xl w-[90%] max-w-[480px] shadow-2xl shadow-black ring-1 ring-white/5 overflow-hidden animate-[bx-pop_0.25s_cubic-bezier(0.16,1,0.3,1)]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 px-5 border-b border-bx-border">
+              <h3 className="text-[15px] font-bold text-slate-100 m-0">Publish Website</h3>
+              <button className="text-bx-text-muted hover:text-bx-text-primary hover:bg-bx-bg-hover rounded-md p-1 transition-colors text-base leading-none cursor-pointer" onClick={() => setPublishModalOpen(false)}>✕</button>
             </div>
 
-            <div className="bx-modal-body">
+            <div className="p-6 px-5 flex flex-col items-center text-center">
               {publishStatus === "publishing" && (
                 <>
-                  <div className="bx-pub-icon-wrapper bx-pub-icon-publishing">
+                  <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl mb-4 bg-indigo-500/15 border border-indigo-500/30 text-indigo-400">
                     <div className="bx-spinner" style={{ width: 28, height: 28, borderWidth: 3 }} />
                   </div>
-                  <h4>Deploying Website…</h4>
-                  <p>Generating standalone HTML/CSS bundle and deploying your website to a live URL.</p>
+                  <h4 className="text-lg font-bold text-white mb-2">Deploying Website…</h4>
+                  <p className="text-[13.5px] text-bx-text-secondary mb-5 leading-relaxed">Generating standalone HTML/CSS bundle and deploying your website to a live URL.</p>
                 </>
               )}
 
               {publishStatus === "success" && (
                 <>
-                  <div className="bx-pub-icon-wrapper bx-pub-icon-success">✓</div>
-                  <h4>Published Successfully!</h4>
-                  <p>Your website is now live and accessible globally at the unique URL below:</p>
+                  <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl mb-4 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">✓</div>
+                  <h4 className="text-lg font-bold text-white mb-2">Published Successfully!</h4>
+                  <p className="text-[13.5px] text-bx-text-secondary mb-5 leading-relaxed">Your website is now live and accessible globally at the unique URL below:</p>
 
-                  <div className="bx-live-url-box">
-                    <span>{publishedData?.url}</span>
+                  <div className="w-full bg-[#0b0b10] border border-bx-border-mid rounded-xl p-3 px-3.5 flex items-center justify-between gap-2.5 mb-5">
+                    <span className="font-mono text-[13px] text-sky-400 break-all text-left">{publishedData?.url}</span>
                   </div>
 
-                  <div className="bx-live-actions">
+                  <div className="flex gap-3 w-full">
                     <a
                       href={publishedData?.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="bx-btn-open-live"
+                      className="flex-[1.2] inline-flex items-center justify-center gap-2 bg-bx-brand hover:bg-bx-brand-hover text-white py-2.5 px-4 rounded-lg text-sm font-semibold cursor-pointer transition-colors shadow-[0_2px_10px_rgba(99,102,241,0.35)]"
                     >
                       <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
                         <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
@@ -1668,7 +1819,7 @@ export default function Builder({ token, projectId, onBack }) {
                       Open Website
                     </a>
                     <button
-                      className="bx-btn-copy-live"
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 bg-bx-bg-surface hover:bg-bx-bg-hover border border-bx-border-strong text-bx-text-primary py-2.5 px-4 rounded-lg text-sm font-semibold cursor-pointer transition-all"
                       onClick={() => {
                         if (publishedData?.url) {
                           navigator.clipboard.writeText(publishedData.url);
@@ -1688,10 +1839,10 @@ export default function Builder({ token, projectId, onBack }) {
 
               {publishStatus === "error" && (
                 <>
-                  <div className="bx-pub-icon-wrapper bx-pub-icon-error">⚠</div>
-                  <h4>Deployment Failed</h4>
-                  <p>{publishError || "An unexpected error occurred while deploying your website."}</p>
-                  <button className="bx-btn-retry" onClick={publishWebsite}>
+                  <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl mb-4 bg-red-500/15 border border-red-500/30 text-red-400">⚠</div>
+                  <h4 className="text-lg font-bold text-white mb-2">Deployment Failed</h4>
+                  <p className="text-[13.5px] text-bx-text-secondary mb-5 leading-relaxed">{publishError || "An unexpected error occurred while deploying your website."}</p>
+                  <button className="bg-bx-brand hover:bg-bx-brand-hover text-white py-2.5 px-6 rounded-lg text-sm font-semibold border-none cursor-pointer shadow-[0_2px_10px_rgba(99,102,241,0.35)] transition-colors" onClick={publishWebsite}>
                     Retry Publish
                   </button>
                 </>

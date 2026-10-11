@@ -1,8 +1,6 @@
 /* ═══════════════════════════════════════════════════════════
    BuildX Builder — v2
    ═══════════════════════════════════════════════════════════ */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 .bx-root {
   display: flex; flex-direction: column;
   height: 100vh; background: var(--bx-bg-base);
@@ -241,6 +239,23 @@
   background: var(--bx-brand-light);
   color: var(--bx-brand-text);
 }
+.bx-grid-control-label {
+  font-size: 10px; font-weight: 700; color: var(--bx-text-ghost);
+  text-transform: uppercase; letter-spacing: .7px;
+}
+.bx-grid-presets { gap: 5px; }
+.bx-grid-settings {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;
+}
+.bx-grid-settings label {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 5px; color: var(--bx-text-muted); font-size: 10px;
+}
+.bx-grid-settings input {
+  width: 48px; min-width: 0; padding: 5px 4px; color: var(--bx-text-primary);
+  background: var(--bx-bg-input); border: 1px solid var(--bx-border-mid);
+  border-radius: var(--r-sm); font-size: 11px;
+}
 .bx-toggle {
   display: inline-flex; align-items: center; gap: 7px;
   font-size: 12px; color: var(--bx-text-secondary);
@@ -375,7 +390,7 @@
 
 /* Grid dots */
 .bx-grid {
-  position: absolute; inset: 0; width: 100%; height: 100%;
+  position: absolute; width: auto; height: auto;
   pointer-events: none; z-index: 0;
 }
 

@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, createContext, useContext } from "react";
+import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import SignIn from "./SignIn";
 import SignUp from "./SignUp";
 import Dashboard from "./Dashboard";
@@ -7,102 +8,187 @@ import PublishedPage from "./PublishedPage";
 import LandingPage from "./LandingPage";
 import Onboarding from "./Onboarding";
 import TemplatePreviewPage from "./TemplatePreviewPage";
+import TailwindTestPage from "./TailwindTestPage";
+import { API_BASE as API } from "./api.js";
 
-const API = "http://localhost:5000/api/v1";
 
-export default function App() {
-  // Check if current path is a public published website (/p/:id)
-  const pathname = window.location.pathname;
-  const isPublicView = pathname.startsWith("/p/");
-  const publicProjectId = isPublicView ? pathname.replace("/p/", "").split("/")[0] : null;
+export const AuthContext = createContext(null);
 
-  const storedToken = localStorage.getItem("token") || "";
-  const [page, setPage] = useState(isPublicView ? "published" : storedToken ? "checking" : "landing");
-  const [token, setToken] = useState(storedToken);
-  const [user, setUser] = useState(null);
-  const [editProjectId, setEditProjectId] = useState(null);
-  const onBackCallback = useRef(null);
+export function useAuth() {
+  return useContext(AuthContext);
+}
 
-  useEffect(() => {
-    if (isPublicView) return; // Do not check auth for public visitors
-    if (page !== "checking") return;
-    fetch(`${API}/projects`, {
-      headers: { Authorization: `Bearer ${storedToken}` },
-      credentials: "include",
-    })
-      .then((r) => {
-        if (r.status === 401) {
-          localStorage.removeItem("token");
-          setToken("");
-          setPage("signin");
-        } else {
-          setPage("dashboard");
-        }
-      })
-      .catch(() => setPage("dashboard"));
-  }, []);
+function ProtectedRoute({ children }) {
+  const { token, loading } = useAuth();
+  const location = useLocation();
 
-  const handleAuth = (t, u, isNewSignup = false) => {
-    setToken(t);
-    setUser(u);
-    setPage(isNewSignup ? "onboarding" : "dashboard");
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    setToken("");
-    setUser(null);
-    setPage("signin");
-  };
-
-  // projectId = null means new project, string means edit existing
-  const handleOpenBuilder = (onReturnCallback, projectId = null) => {
-    onBackCallback.current = onReturnCallback || null;
-    setEditProjectId(projectId);
-    setPage("builder");
-  };
-
-  const handleBuilderBack = () => {
-    setPage("dashboard");
-    setEditProjectId(null);
-    if (onBackCallback.current) {
-      onBackCallback.current();
-      onBackCallback.current = null;
-    }
-  };
-
-  if (page === "published")
-    return <PublishedPage projectId={publicProjectId} />;
-
-  if (page === "checking")
+  if (loading) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f0f13" }}>
         <div style={{ width: 32, height: 32, border: "3px solid #1e1e2e", borderTopColor: "#6366f1", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
+  }
 
-  if (page === "landing")
-    return <LandingPage onGetStarted={() => setPage("signup")} onSignIn={() => setPage("signin")} />;
+  if (!token) {
+    return <Navigate to="/signin" state={{ from: location }} replace />;
+  }
 
-  if (page === "signin")
-    return <SignIn onAuth={handleAuth} goToSignUp={() => setPage("signup")} />;
+  return children;
+}
 
-  if (page === "signup")
-    return <SignUp onAuth={handleAuth} goToSignIn={() => setPage("signin")} />;
+function PublicAuthRoute({ children }) {
+  const { token, loading } = useAuth();
 
-  if (page === "onboarding")
-    return <Onboarding user={user} onComplete={() => setPage("dashboard")} />;
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f0f13" }}>
+        <div style={{ width: 32, height: 32, border: "3px solid #1e1e2e", borderTopColor: "#6366f1", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
-  if (page === "builder")
-    return <Builder token={token} projectId={editProjectId} onBack={handleBuilderBack} />;
+  if (token) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+}
+
+export default function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const [token, setToken] = useState(() => localStorage.getItem("token") || "");
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Check URL params for Google OAuth callback (?token=...&googleAuth=success)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const googleToken = params.get("token");
+    if (googleToken) {
+      localStorage.setItem("token", googleToken);
+      setToken(googleToken);
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.search, location.pathname, navigate]);
+
+  // Validate stored token against API
+  useEffect(() => {
+    const currentToken = localStorage.getItem("token");
+    if (!currentToken) {
+      setLoading(false);
+      return;
+    }
+
+    fetch(`${API}/projects`, {
+      headers: { Authorization: `Bearer ${currentToken}` },
+      credentials: "include",
+    })
+      .then((r) => {
+        if (r.status === 401) {
+          localStorage.removeItem("token");
+          setToken("");
+          setUser(null);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
+
+  const handleAuth = (t, u, isNewSignup = false) => {
+    localStorage.setItem("token", t);
+    setToken(t);
+    setUser(u);
+    navigate(isNewSignup ? "/onboarding" : "/dashboard");
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    setToken("");
+    setUser(null);
+    navigate("/signin");
+  };
 
   return (
-    <Dashboard
-      token={token}
-      user={user}
-      onLogout={handleLogout}
-      onOpenBuilder={handleOpenBuilder}
-    />
+    <AuthContext.Provider value={{ token, user, loading, handleAuth, handleLogout, setToken, setUser }}>
+      <Routes>
+        <Route path="/tailwind-test" element={<TailwindTestPage />} />
+        <Route
+          path="/"
+          element={
+            <LandingPage
+              onGetStarted={() => navigate("/signup")}
+              onSignIn={() => navigate("/signin")}
+            />
+          }
+        />
+        <Route
+          path="/signin"
+          element={
+            <PublicAuthRoute>
+              <SignIn onAuth={handleAuth} goToSignUp={() => navigate("/signup")} />
+            </PublicAuthRoute>
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            <PublicAuthRoute>
+              <SignUp onAuth={handleAuth} goToSignIn={() => navigate("/signin")} />
+            </PublicAuthRoute>
+          }
+        />
+
+        <Route
+          path="/onboarding"
+          element={
+            <ProtectedRoute>
+              <Onboarding user={user} onComplete={() => navigate("/dashboard")} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard
+                token={token}
+                user={user}
+                onLogout={handleLogout}
+                onOpenBuilder={(_cb, id) => navigate(id ? `/builder/${id}` : "/builder")}
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/builder"
+          element={
+            <ProtectedRoute>
+              <Builder token={token} onBack={() => navigate("/dashboard")} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/builder/:projectId"
+          element={
+            <ProtectedRoute>
+              <Builder token={token} onBack={() => navigate("/dashboard")} />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/p/:projectId" element={<PublishedPage />} />
+        <Route
+          path="/templates/:id"
+          element={<TemplatePreviewPage onClose={() => navigate("/dashboard")} />}
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AuthContext.Provider>
   );
 }
