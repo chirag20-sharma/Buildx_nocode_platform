@@ -9,24 +9,76 @@ function escapeHTML(str) {
     .replace(/'/g, "&#039;");
 }
 
+// Allow only http:, https:, or relative URLs; block javascript: and data:
+function safeUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (/^(https?:)?\/\//i.test(trimmed) || /^\/[^/]/i.test(trimmed) || /^[^:/?#]+$/i.test(trimmed)) {
+    // Reject javascript: and data: schemes
+    if (/^(javascript|data|vbscript):/i.test(trimmed)) return '';
+    return trimmed;
+  }
+  if (/^https?:/i.test(trimmed)) return trimmed;
+  return '';
+}
+
+// Validate CSS values: allow only alphanumeric, spaces, #, %, px, em, rem, (, ), ., -, /
+function safeCSSValue(val) {
+  if (!val && val !== 0) return '';
+  return String(val).replace(/[^a-zA-Z0-9 #%.,()\-\/]/g, '');
+}
+
+// Validate integer/float CSS numbers
+function safeCSSNumber(val, fallback = 0) {
+  const n = parseFloat(val);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function parseList(val, defaultList = []) {
   if (Array.isArray(val)) return val.map(x => String(x).trim()).filter(Boolean);
   if (typeof val === 'string') return val.split(',').map(x => x.trim()).filter(Boolean);
   return defaultList;
 }
 
+function toCSSJustify(val) {
+  if (val === "between") return "space-between";
+  if (val === "around") return "space-around";
+  if (val === "evenly") return "space-evenly";
+  if (val === "start") return "flex-start";
+  if (val === "end") return "flex-end";
+  if (val === "center") return "center";
+  return val || "flex-start";
+}
+
+function toCSSAlign(val) {
+  if (val === "start") return "flex-start";
+  if (val === "end") return "flex-end";
+  if (val === "center") return "center";
+  if (val === "stretch") return "stretch";
+  if (val === "baseline") return "baseline";
+  return val || "stretch";
+}
+
 // Maps component type to HTML generation
 const COMP_MAP = {
   navbar: (c) => {
     const brand = escapeHTML(c.properties?.brand || "My Brand");
+    const brandUrl = safeUrl(c.properties?.brandUrl) || "#";
     const links = parseList(c.properties?.links, ["Home", "About", "Contact"]);
+    const linkUrls = parseList(c.properties?.linkUrls, []);
+    const target = c.properties?.target || "_self";
+    const relAttr = target === "_blank" ? ' rel="noopener noreferrer"' : '';
     const bg = c.properties?.bg || "#0f172a";
     const color = c.properties?.color || "#f1f5f9";
     return `
   <nav class="bx-navbar" style="background-color: ${bg}; color: ${color};">
-    <div class="bx-nav-brand">${brand}</div>
+    <a href="${brandUrl}" target="${target}"${relAttr} class="bx-nav-brand" style="color: inherit; text-decoration: none; font-weight: 700;">${brand}</a>
     <div class="bx-nav-links">
-      ${links.map(l => `<a href="#${l.toLowerCase()}" class="bx-nav-link" style="color: ${color};">${escapeHTML(l)}</a>`).join("\n      ")}
+      ${links.map((l, i) => {
+        const rawUrl = linkUrls[i] || `#${l.toLowerCase().replace(/\s+/g, '-')}`;
+        const url = safeUrl(rawUrl) || rawUrl;
+        return `<a href="${url}" target="${target}"${relAttr} class="bx-nav-link" style="color: ${color}; text-decoration: none;">${escapeHTML(l)}</a>`;
+      }).join("\n      ")}
     </div>
   </nav>`;
   },
@@ -35,6 +87,9 @@ const COMP_MAP = {
     const heading = escapeHTML(c.properties?.heading || c.properties?.text || "Build Something Amazing");
     const subtext = escapeHTML(c.properties?.subtext || c.properties?.content || "The easiest way to design, build, and publish modern websites.");
     const cta = escapeHTML(c.properties?.cta || "Get Started");
+    const ctaHref = safeUrl(c.properties?.ctaHref) || "#";
+    const target = c.properties?.target || "_self";
+    const relAttr = target === "_blank" ? ' rel="noopener noreferrer"' : '';
     const bg = c.properties?.bg || "#0f172a";
     const color = c.properties?.color || "#f1f5f9";
     return `
@@ -42,7 +97,7 @@ const COMP_MAP = {
     <div class="bx-hero-content">
       <h1>${heading}</h1>
       <p>${subtext}</p>
-      ${cta ? `<button class="bx-button bx-hero-btn" onclick="alert('Action triggered: ${cta}')">${cta}</button>` : ""}
+      ${cta ? `<a class="bx-button bx-hero-btn" href="${ctaHref}" target="${target}"${relAttr}>${cta}</a>` : ""}
     </div>
   </section>`;
   },
@@ -60,36 +115,54 @@ const COMP_MAP = {
     const fontSize = c.properties?.fontSize ? `${c.properties.fontSize}px` : "32px";
     const fontWeight = c.properties?.fontWeight || "700";
     const color = c.properties?.color || "#0f172a";
-    return `  <h2 class="bx-heading" style="font-size: ${fontSize}; font-weight: ${fontWeight}; color: ${color};">${text}</h2>`;
+    const href = safeUrl(c.properties?.href);
+    const target = c.properties?.target || "_self";
+    const relAttr = target === "_blank" ? ' rel="noopener noreferrer"' : '';
+    const hEl = `<h2 class="bx-heading" style="font-size: ${fontSize}; font-weight: ${fontWeight}; color: ${color}; margin: 0;">${text}</h2>`;
+    return href ? `  <a href="${href}" target="${target}"${relAttr} style="text-decoration: none; color: inherit;">${hEl}</a>` : `  ${hEl}`;
   },
 
   text: (c) => {
     const text = escapeHTML(c.properties?.text || c.properties?.content || "Text block");
     const fontSize = c.properties?.fontSize ? `${c.properties.fontSize}px` : "16px";
     const color = c.properties?.color || "#475569";
-    return `  <p class="bx-text" style="font-size: ${fontSize}; color: ${color};">${text}</p>`;
+    const href = safeUrl(c.properties?.href);
+    const target = c.properties?.target || "_self";
+    const relAttr = target === "_blank" ? ' rel="noopener noreferrer"' : '';
+    const pEl = `<p class="bx-text" style="font-size: ${fontSize}; color: ${color}; margin: 0;">${text}</p>`;
+    return href ? `  <a href="${href}" target="${target}"${relAttr} style="text-decoration: none; color: inherit;">${pEl}</a>` : `  ${pEl}`;
   },
 
   button: (c) => {
     const text = escapeHTML(c.properties?.text || "Click me");
     const bg = c.properties?.bg || "#6366f1";
     const color = c.properties?.color || "#ffffff";
-    const radius = c.properties?.radius !== undefined ? `${c.properties.radius}px` : "8px";
-    return `  <button class="bx-button" style="background-color: ${bg}; color: ${color}; border-radius: ${radius};" onclick="alert('Button clicked: ${text}')">${text}</button>`;
+    const radius = safeCSSNumber(c.properties?.radius, 8);
+    const href = safeUrl(c.properties?.href);
+    const target = c.properties?.target || "_self";
+    const relAttr = target === "_blank" ? ' rel="noopener noreferrer"' : '';
+    if (href) {
+      return `  <a href="${href}" target="${target}"${relAttr} class="bx-button" style="display: inline-flex; align-items: center; justify-content: center; text-decoration: none; background-color: ${safeCSSValue(bg)}; color: ${safeCSSValue(color)}; border-radius: ${radius}px; padding: 10px 20px;">${text}</a>`;
+    }
+    return `  <button class="bx-button" style="background-color: ${safeCSSValue(bg)}; color: ${safeCSSValue(color)}; border-radius: ${radius}px;">${text}</button>`;
   },
 
   image: (c) => {
-    const src = c.properties?.src || "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&auto=format&fit=crop&q=80";
+    const src = safeUrl(c.properties?.src || "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&auto=format&fit=crop&q=80");
     const alt = escapeHTML(c.properties?.alt || "Image");
-    const fit = c.properties?.fit || "cover";
-    return `  <div class="bx-image-wrapper"><img class="bx-image" src="${src}" alt="${alt}" style="object-fit: ${fit};" /></div>`;
+    const fit = safeCSSValue(c.properties?.fit || "cover");
+    const href = safeUrl(c.properties?.href);
+    const target = c.properties?.target || "_self";
+    const relAttr = target === "_blank" ? ' rel="noopener noreferrer"' : '';
+    const imgEl = `<div class="bx-image-wrapper"><img class="bx-image" src="${escapeHTML(src)}" alt="${alt}" style="object-fit: ${fit};" /></div>`;
+    return href ? `  <a href="${href}" target="${target}"${relAttr} style="display: block; text-decoration: none;">${imgEl}</a>` : `  ${imgEl}`;
   },
 
   imagegrid: (c) => {
-    const cols = c.properties?.cols || c.properties?.desktopCols || 3;
-    const gap = c.properties?.gap || 12;
-    const radius = c.properties?.radius !== undefined ? `${c.properties.radius}px` : "8px";
-    const fit = c.properties?.fit || "cover";
+    const cols = safeCSSNumber(c.properties?.cols || c.properties?.desktopCols, 3);
+    const gap = safeCSSNumber(c.properties?.gap, 12);
+    const radius = safeCSSNumber(c.properties?.radius, 8);
+    const fit = safeCSSValue(c.properties?.fit || "cover");
     const rawImgs = Array.isArray(c.properties?.images) ? c.properties.images : [];
     const images = rawImgs.length > 0 ? rawImgs : [
       { src: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=500&auto=format&fit=crop&q=60", alt: "Photo 1" },
@@ -99,15 +172,15 @@ const COMP_MAP = {
     return `
   <div class="bx-imagegrid" style="grid-template-columns: repeat(${cols}, 1fr); gap: ${gap}px;">
     ${images.map(img => `
-      <div class="bx-imagegrid-item" style="border-radius: ${radius};">
-        <img src="${img.src || 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=500&auto=format&fit=crop&q=60'}" alt="${escapeHTML(img.alt || 'Grid Image')}" style="object-fit: ${fit}; border-radius: ${radius};" />
+      <div class="bx-imagegrid-item" style="border-radius: ${radius}px;">
+        <img src="${escapeHTML(safeUrl(img.src || 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=500&auto=format&fit=crop&q=60'))}" alt="${escapeHTML(img.alt || 'Grid Image')}" style="object-fit: ${fit}; border-radius: ${radius}px;" />
       </div>`).join("\n    ")}
   </div>`;
   },
 
   video: (c) => {
-    const src = c.properties?.src || "";
-    const poster = c.properties?.poster || "";
+    const src = safeUrl(c.properties?.src || "");
+    const poster = safeUrl(c.properties?.poster || "");
     const controls = c.properties?.controls !== false ? "controls" : "";
     if (!src) {
       return `
@@ -118,7 +191,7 @@ const COMP_MAP = {
     }
     return `
   <div class="bx-video-wrapper">
-    <video src="${src}" poster="${poster}" ${controls} class="bx-video"></video>
+    <video src="${escapeHTML(src)}" poster="${escapeHTML(poster)}" ${controls} class="bx-video"></video>
   </div>`;
   },
 
@@ -137,18 +210,26 @@ const COMP_MAP = {
     const body = escapeHTML(c.properties?.body || "Card description goes here.");
     const bg = c.properties?.bg || "#ffffff";
     const radius = c.properties?.radius !== undefined ? `${c.properties.radius}px` : "12px";
-    return `
+    const href = safeUrl(c.properties?.href);
+    const target = c.properties?.target || "_self";
+    const relAttr = target === "_blank" ? ' rel="noopener noreferrer"' : '';
+    const cardEl = `
   <div class="bx-card" style="background-color: ${bg}; border-radius: ${radius};">
     <h3>${title}</h3>
     <p>${body}</p>
   </div>`;
+    return href ? `  <a href="${href}" target="${target}"${relAttr} style="text-decoration: none; color: inherit; display: block;">${cardEl}</a>` : cardEl;
   },
 
   badge: (c) => {
     const text = escapeHTML(c.properties?.text || "New");
     const bg = c.properties?.bg || "#6366f1";
     const color = c.properties?.color || "#ffffff";
-    return `  <span class="bx-badge" style="background-color: ${bg}; color: ${color};">${text}</span>`;
+    const href = safeUrl(c.properties?.href);
+    const target = c.properties?.target || "_self";
+    const relAttr = target === "_blank" ? ' rel="noopener noreferrer"' : '';
+    const badgeEl = `<span class="bx-badge" style="background-color: ${bg}; color: ${color};">${text}</span>`;
+    return href ? `  <a href="${href}" target="${target}"${relAttr} style="text-decoration: none; display: inline-block;">${badgeEl}</a>` : `  ${badgeEl}`;
   },
 
   alert: (c) => {
@@ -218,20 +299,21 @@ const COMP_MAP = {
     return `
   <div class="bx-formblock">
     <h3>${title}</h3>
-    <form onsubmit="event.preventDefault(); alert('Message sent successfully!');">
+    <form class="bx-contact-form" onsubmit="window.handleFormSubmit ? window.handleFormSubmit(event, this) : event.preventDefault()">
       <div class="bx-form-group">
         <label class="bx-label">Name</label>
-        <input type="text" class="bx-input" placeholder="Your name" required />
+        <input type="text" name="name" class="bx-input" placeholder="Your full name" required />
       </div>
       <div class="bx-form-group">
         <label class="bx-label">Email</label>
-        <input type="email" class="bx-input" placeholder="Your email" required />
+        <input type="email" name="email" class="bx-input" placeholder="you@example.com" required />
       </div>
       <div class="bx-form-group">
-        <label class="bx-label">Message</label>
-        <textarea class="bx-textarea" placeholder="How can we help?" rows="3" required></textarea>
+        <label class="bx-label">Product / Message</label>
+        <textarea name="message" class="bx-textarea" placeholder="Tell us which product or enquiry you have..." rows="3" required></textarea>
       </div>
       <button type="submit" class="bx-button bx-form-submit">${cta}</button>
+      <div class="bx-form-msg" style="display:none; margin-top:12px; padding:10px 14px; border-radius:8px; font-size:13px; font-weight:600;"></div>
     </form>
   </div>`;
   },
@@ -270,7 +352,10 @@ const COMP_MAP = {
     const brand = escapeHTML(c.properties?.brand || "AudioTech");
     const price = escapeHTML(c.properties?.price || "$199.99");
     const rating = c.properties?.rating || 4.8;
-    return `
+    const href = safeUrl(c.properties?.href);
+    const target = c.properties?.target || "_self";
+    const relAttr = target === "_blank" ? ' rel="noopener noreferrer"' : '';
+    const pcardEl = `
   <div class="bx-product-card">
     <div class="bx-product-img">
       <img src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&auto=format&fit=crop&q=60" alt="${name}" />
@@ -280,9 +365,10 @@ const COMP_MAP = {
       <h4>${name}</h4>
       <div class="bx-product-rating">★ ${rating}</div>
       <div class="bx-product-price">${price}</div>
-      <button class="bx-button bx-cart-btn" onclick="alert('Added ${name} to cart!')">Add to Cart</button>
+      <button class="bx-button bx-cart-btn">Add to Cart</button>
     </div>
   </div>`;
+    return href ? `  <a href="${href}" target="${target}"${relAttr} style="text-decoration: none; color: inherit; display: block;">${pcardEl}</a>` : pcardEl;
   },
 
   pricingcard: (c) => {
@@ -298,7 +384,7 @@ const COMP_MAP = {
     <ul class="bx-pricing-features">
       ${features.map(f => `<li>✓ ${escapeHTML(f)}</li>`).join("\n      ")}
     </ul>
-    <button class="bx-button bx-pricing-btn" onclick="alert('Selected ${plan}')">Choose Plan</button>
+    <button class="bx-button bx-pricing-btn">Choose Plan</button>
   </div>`;
   },
 
@@ -321,7 +407,10 @@ const COMP_MAP = {
     const author = escapeHTML(c.properties?.author || "Alex Rivera");
     const category = escapeHTML(c.properties?.category || "Engineering");
     const readTime = escapeHTML(c.properties?.readTime || "5 min read");
-    return `
+    const href = safeUrl(c.properties?.href);
+    const target = c.properties?.target || "_self";
+    const relAttr = target === "_blank" ? ' rel="noopener noreferrer"' : '';
+    const bcardEl = `
   <div class="bx-blog-card">
     <div class="bx-blog-meta">
       <span class="bx-blog-category">${category}</span>
@@ -330,6 +419,7 @@ const COMP_MAP = {
     <h3>${title}</h3>
     <div class="bx-blog-author">By ${author}</div>
   </div>`;
+    return href ? `  <a href="${href}" target="${target}"${relAttr} style="text-decoration: none; color: inherit; display: block;">${bcardEl}</a>` : bcardEl;
   },
 
   statcard: (c) => {
@@ -367,9 +457,22 @@ const COMP_MAP = {
     const text = escapeHTML(c.properties?.text || `© ${new Date().getFullYear()} All rights reserved.`);
     const bg = c.properties?.bg || "#0f172a";
     const color = c.properties?.color || "#94a3b8";
+    const href = safeUrl(c.properties?.href);
+    const target = c.properties?.target || "_self";
+    const relAttr = target === "_blank" ? ' rel="noopener noreferrer"' : '';
+    const pos = c.properties?.position || (c.properties?.pinBottom ? "push-bottom" : "normal");
+    let posStyles = "";
+    if (pos === "push-bottom" || c.properties?.pinBottom) {
+      posStyles = "margin-top: auto;";
+    } else if (pos === "sticky-bottom") {
+      posStyles = "position: sticky; bottom: 0; z-index: 40;";
+    } else if (pos === "fixed-bottom") {
+      posStyles = "position: fixed; bottom: 0; left: 0; width: 100%; z-index: 40;";
+    }
+    const content = href ? `<a href="${href}" target="${target}"${relAttr} style="color: inherit; text-decoration: none;">${text}</a>` : text;
     return `
-  <footer class="bx-footer" style="background-color: ${bg}; color: ${color};">
-    <p>${text}</p>
+  <footer class="bx-footer" style="background-color: ${bg}; color: ${color}; ${posStyles}">
+    <p>${content}</p>
   </footer>`;
   },
 
@@ -377,11 +480,11 @@ const COMP_MAP = {
     const grid = c.properties?.grid || { items: [] };
     const cards = (grid.items || []).map(item => `
     <div class="bx-product-card">
-      <div class="bx-product-img">${item.src ? `<img src="${item.src}" alt="${escapeHTML(item.name || 'Product')}" />` : '<div class="bx-img-placeholder">🖼 Product Image</div>'}</div>
+      <div class="bx-product-img">${item.src ? `<img src="${escapeHTML(safeUrl(item.src))}" alt="${escapeHTML(item.name || 'Product')}" />` : '<div class="bx-img-placeholder">🖼 Product Image</div>'}</div>
       <div class="bx-product-info">
         <h4>${escapeHTML(item.name || 'Product Name')}</h4>
         <div class="bx-product-price">${escapeHTML(item.price || '$0.00')}</div>
-        <button class="bx-button bx-cart-btn" onclick="alert('Added ${escapeHTML(item.name || 'Product')} to cart!')">${escapeHTML(item.btn || 'Add to Cart')}</button>
+        <button class="bx-button bx-cart-btn">${escapeHTML(item.btn || 'Add to Cart')}</button>
       </div>
     </div>`).join("\n");
     return `  <section class="bx-product-grid-section">\n  <div class="bx-product-grid" style="grid-template-columns: repeat(auto-fit, minmax(${grid.imgW || 240}px, 1fr)); gap: ${grid.gap || 20}px;">\n${cards}\n  </div>\n  </section>`;
@@ -392,11 +495,62 @@ const COMP_MAP = {
 COMP_MAP["productGrid"] = COMP_MAP.productgrid;
 COMP_MAP["imageGrid"] = COMP_MAP.imagegrid;
 
-function renderComponent(c) {
+function renderComponent(c, allComponents = []) {
   try {
+    if (!c) return "";
+    if ((!c.properties || Object.keys(c.properties).length === 0) && c.props && Object.keys(c.props).length > 0) {
+      c.properties = c.props;
+    }
+    const children = Array.isArray(allComponents)
+      ? allComponents.filter(child => child && child.parentId === c.id)
+      : [];
+
     const typeKey = (c.type || "").toLowerCase().replace(/[-_\s]/g, "");
     const fn = COMP_MAP[typeKey] || COMP_MAP[c.type];
-    if (fn) return fn(c);
+    if (fn) {
+      const base = fn(c);
+      if (children.length === 0) return base;
+      if (c.type === "section" || c.type === "container") {
+        const layout = c.properties?.layout || "stack";
+        const gap = Number(c.properties?.gap ?? (c.type === "section" ? 16 : 12));
+        const padding = Number(c.properties?.padding ?? (c.type === "section" ? 32 : 16));
+        const cols = Math.max(1, Number(c.properties?.cols || 3));
+        const maxWidth = c.type === "container" ? (c.properties?.maxWidth || "1200px") : "100%";
+        const margin = c.type === "container" ? "0 auto" : "0";
+        const bg = c.properties?.bg || (c.type === "section" ? "#f8fafc" : "#ffffff");
+        const radius = c.properties?.radius ? `${c.properties.radius}px` : "0";
+        const border = c.properties?.borderColor && c.properties.borderColor !== "transparent" ? `1px solid ${c.properties.borderColor}` : "none";
+
+        const alignCSS = toCSSAlign(c.properties?.align);
+        const justifyCSS = toCSSJustify(c.properties?.justify);
+        let layoutCSS = `display: flex; flex-direction: column; gap: ${gap}px; align-items: ${alignCSS}; justify-content: ${justifyCSS};`;
+        if (layout === "row") {
+          layoutCSS = `display: flex; flex-direction: row; flex-wrap: wrap; gap: ${gap}px; align-items: ${alignCSS}; justify-content: ${justifyCSS};`;
+        } else if (layout === "grid") {
+          layoutCSS = `display: grid; grid-template-columns: repeat(${cols}, minmax(0, 1fr)); gap: ${gap}px; align-items: ${alignCSS};`;
+        }
+
+        const sortedChildren = children.sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
+        const childMarkup = sortedChildren.map(child => `  <div class="bx-nested-child">${renderComponent(child, allComponents)}</div>`).join("\n");
+        const sectionIdAttr = c.properties?.sectionId || c.properties?.id ? `id="${escapeHTML(c.properties.sectionId || c.properties.id)}" ` : "";
+        return `
+  <div ${sectionIdAttr}class="bx-${c.type}-wrapper" style="background-color: ${bg}; padding: ${padding}px; border-radius: ${radius}; border: ${border}; max-width: ${maxWidth}; margin: ${margin}; width: 100%; box-sizing: border-box; ${layoutCSS}">
+    ${childMarkup}
+  </div>`;
+      }
+      if (c.type === "columns") {
+        const cols = Math.max(1, Number(c.properties?.cols || children.length || 2));
+        const gap = Number(c.properties?.gap ?? 12);
+        const padding = Number(c.properties?.padding ?? 8);
+        const sortedChildren = children.sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
+        const columnMarkup = sortedChildren.map(child => `  <div class="bx-column-child" style="min-width: 0;">${renderComponent(child, allComponents)}</div>`).join("\n");
+        return `
+  <div class="bx-columns-wrapper" style="display: grid; grid-template-columns: repeat(${cols}, minmax(0, 1fr)); gap: ${gap}px; padding: ${padding}px; width: 100%; box-sizing: border-box;">
+    ${columnMarkup}
+  </div>`;
+      }
+      return base;
+    }
     const content = escapeHTML(c.properties?.text || c.properties?.title || c.properties?.content || c.type || "");
     return `  <div class="bx-custom">${content}</div>`;
   } catch (err) {
@@ -414,13 +568,24 @@ export function generateHTML(project) {
     : [{ id: "page-1", name: "Home", components: Array.isArray(project.components) ? project.components : [] }];
 
   const renderPageBlock = (page, pageIndex) => {
-    const components = Array.isArray(page.components) ? page.components : [];
+    let components = Array.isArray(page.components) && page.components.length > 0
+      ? page.components
+      : (Array.isArray(project.components) ? project.components : []);
+
+    if (pageIndex === 0 && Array.isArray(project.components) && project.components.length > 0) {
+      const pageHasProps = components.some(c => (c.properties && Object.keys(c.properties).length > 0) || (c.props && Object.keys(c.props).length > 0));
+      if (!pageHasProps) {
+        components = project.components;
+      }
+    }
+
+    const rootComponents = components.filter(c => !c.parentId);
     const hasAbsolutePositions = components.some(c => c.position && (c.position.x > 0 || c.position.y > 0));
 
     let inner = "";
 
     if (hasAbsolutePositions) {
-      const sorted = [...components].sort((a, b) => ((a.position?.y || 0) - (b.position?.y || 0)) || ((a.position?.x || 0) - (b.position?.x || 0)));
+      const sorted = [...rootComponents].sort((a, b) => ((a.position?.y || 0) - (b.position?.y || 0)) || ((a.position?.x || 0) - (b.position?.x || 0)));
       inner = `
     <main class="bx-canvas-wrapper">
       <div class="bx-canvas-layout">
@@ -431,7 +596,7 @@ export function generateHTML(project) {
           const h = c.styles?.height ? `${c.styles.height}px` : "auto";
           return `
         <div class="bx-positioned-node" style="position: absolute; left: ${x}px; top: ${y}px; width: ${w}; min-height: ${h};">
-          ${renderComponent(c)}
+          ${renderComponent(c, components)}
         </div>`;
         }).join("\n")}
       </div>
@@ -439,7 +604,7 @@ export function generateHTML(project) {
     } else {
       inner = `
     <main class="bx-flow-wrapper">
-      ${components.map(c => renderComponent(c)).join("\n\n")}
+      ${rootComponents.map(c => renderComponent(c, components)).join("\n\n")}
     </main>`;
     }
 
@@ -453,13 +618,25 @@ export function generateHTML(project) {
     <button type="button" class="bx-page-tab${idx === 0 ? " active" : ""}" data-target="${escapeHTML(page.id || page.name || `page-${idx + 1}`)}">${escapeHTML(page.name || `Page ${idx + 1}`)}</button>
   `).join("\n");
 
+  const siteTitle   = escapeHTML(project.settings?.siteTitle || project.name || "Published Website");
+  const metaDesc    = escapeHTML(project.settings?.metaDesc  || project.description || "Created with BuildX");
+  const lang        = escapeHTML(project.settings?.language  || "en");
+  const favicon     = safeUrl(project.settings?.favicon || "");
+  const ogImage     = safeUrl(project.settings?.ogImage  || "");
+  const clientUrl   = process.env.CLIENT_URL || "http://localhost:5173";
+
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${lang}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapeHTML(project.name || "Published Website")}</title>
-  <meta name="description" content="${escapeHTML(project.description || "Created with BuildX")}" />
+  <title>${siteTitle}</title>
+  <meta name="description" content="${metaDesc}" />
+  <meta property="og:title" content="${siteTitle}" />
+  <meta property="og:description" content="${metaDesc}" />
+  <meta property="og:type" content="website" />
+  ${ogImage ? `<meta property="og:image" content="${escapeHTML(ogImage)}" />` : ""}
+  ${favicon ? `<link rel="icon" href="${escapeHTML(favicon)}" />` : ""}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -471,13 +648,66 @@ export function generateHTML(project) {
 
   <!-- Floating "Built with BuildX" Badge -->
   <aside class="bx-watermark">
-    <a href="http://localhost:5173" target="_blank" rel="noopener noreferrer">
+    <a href="${escapeHTML(process.env.CLIENT_URL || 'http://localhost:5173')}" target="_blank" rel="noopener noreferrer">
       <span class="bx-watermark-icon">B</span>
       <span>Built with BuildX</span>
     </a>
   </aside>
 
   <script>
+    // BuildX analytics — no personal data collected
+    (function(){
+      try {
+        fetch('/api/v1/analytics/${escapeHTML(project.slug || '')}' + '/hit', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ path: location.pathname, referrer: document.referrer })
+        });
+      } catch(e){}
+    })();
+
+    window.handleFormSubmit = async function(event, form) {
+      event.preventDefault();
+      const msgEl = form.querySelector('.bx-form-msg');
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+      if (msgEl) {
+        msgEl.style.display = 'block';
+        msgEl.style.color = '#3b82f6';
+        msgEl.style.background = '#eff6ff';
+        msgEl.innerText = 'Submitting message...';
+      }
+      try {
+        const name = form.querySelector('input[name="name"]')?.value || '';
+        const email = form.querySelector('input[name="email"]')?.value || '';
+        const message = form.querySelector('textarea[name="message"]')?.value || '';
+        const projectId = '${escapeHTML(project._id || project.id || '')}';
+        const res = await fetch('/api/v1/forms/' + projectId + '/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, message })
+        });
+        const result = await res.json();
+        if (res.ok && result.success !== false) {
+          if (msgEl) {
+            msgEl.style.color = '#15803d';
+            msgEl.style.background = '#dcfce7';
+            msgEl.innerText = 'Thank you! Your enquiry has been received.';
+          }
+          form.reset();
+        } else {
+          throw new Error(result.message || 'Submission failed');
+        }
+      } catch (err) {
+        if (msgEl) {
+          msgEl.style.color = '#b91c1c';
+          msgEl.style.background = '#fee2e2';
+          msgEl.innerText = err.message || 'Error sending message. Please try again.';
+        }
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    };
+
     function switchTab(btn, containerId, targetIndex) {
       const container = document.getElementById(containerId);
       if (!container) return;
@@ -593,6 +823,7 @@ body {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
   gap: 24px;
 }
 

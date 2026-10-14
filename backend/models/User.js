@@ -19,14 +19,16 @@ const UserSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, "Password is required"],
-    minlength: [6, "Password must be at least 6 characters"]
+    minlength: [6, "Password must be at least 6 characters"],
+    default: null
   },
   role: {
     type: String,
     enum: ["user", "admin"],
     default: "user"
-  }
+  },
+  resetPasswordToken: { type: String, default: undefined },
+  resetPasswordExpires: { type: Date, default: undefined }
 }, {
   timestamps: true // Automatically adds createdAt and updatedAt
 });

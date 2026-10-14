@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 const ComponentSchema = new mongoose.Schema({
   id:         { type: String },
   type:       { type: String, required: true },
+  parentId:   { type: String, default: null },
+  order:      { type: Number, default: 0 },
   properties: { type: mongoose.Schema.Types.Mixed, default: {} },
   styles:     { type: mongoose.Schema.Types.Mixed, default: {} },
   position: {
@@ -10,6 +12,12 @@ const ComponentSchema = new mongoose.Schema({
     y: { type: Number, default: 0 }
   }
 });
+
+const PageSchema = new mongoose.Schema({
+  id: { type: String, default: null },
+  name: { type: String, default: "Page" },
+  components: [ComponentSchema]
+}, { _id: false });
 
 const ProjectSchema = new mongoose.Schema({
   name: {
@@ -31,12 +39,27 @@ const ProjectSchema = new mongoose.Schema({
   },
   components: [ComponentSchema],
   settings: {
-    theme:  { type: String, enum: ["light", "dark", "custom"], default: "light" },
-    layout: { type: String, enum: ["fixed", "responsive"], default: "responsive" }
+    theme:       { type: String, enum: ["light", "dark", "custom"], default: "light" },
+    layout:      { type: String, enum: ["fixed", "responsive"], default: "responsive" },
+    pages:       { type: [PageSchema], default: [] },
+    siteTitle:   { type: String, default: "" },
+    metaDesc:    { type: String, default: "" },
+    favicon:     { type: String, default: "" },
+    language:    { type: String, default: "en" },
+    ogImage:     { type: String, default: "" }
   },
   isPublished:  { type: Boolean, default: false },
   slug:         { type: String, trim: true, lowercase: true, default: null },
-  publishedUrl: { type: String, default: null }
+  publishedUrl: { type: String, default: null },
+  versions: {
+    type: [{
+      components: [ComponentSchema],
+      settings:   { type: mongoose.Schema.Types.Mixed, default: {} },
+      savedAt:    { type: Date, default: Date.now },
+      label:      { type: String, default: '' }
+    }],
+    default: []
+  }
 }, { timestamps: true });
 
 export default mongoose.model("Project", ProjectSchema);

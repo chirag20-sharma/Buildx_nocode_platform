@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext } from "react";
-import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from "react-router-dom";
 import SignIn from "./SignIn";
 import SignUp from "./SignUp";
 import Dashboard from "./Dashboard";
@@ -24,8 +24,8 @@ function ProtectedRoute({ children }) {
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f0f13" }}>
-        <div style={{ width: 32, height: 32, border: "3px solid #1e1e2e", borderTopColor: "#6366f1", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8f8fb" }}>
+        <div style={{ width: 32, height: 32, border: "3px solid #e0e0ec", borderTopColor: "#6366f1", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -43,8 +43,8 @@ function PublicAuthRoute({ children }) {
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f0f13" }}>
-        <div style={{ width: 32, height: 32, border: "3px solid #1e1e2e", borderTopColor: "#6366f1", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8f8fb" }}>
+        <div style={{ width: 32, height: 32, border: "3px solid #e0e0ec", borderTopColor: "#6366f1", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -55,6 +55,11 @@ function PublicAuthRoute({ children }) {
   }
 
   return children;
+}
+
+function BuilderRoute({ token, onBack }) {
+  const { projectId } = useParams();
+  return <Builder key={projectId || "new-project"} projectId={projectId} token={token} onBack={onBack} />;
 }
 
 export default function App() {
@@ -170,7 +175,7 @@ export default function App() {
           path="/builder"
           element={
             <ProtectedRoute>
-              <Builder token={token} onBack={() => navigate("/dashboard")} />
+              <Builder key="new-project" token={token} onBack={() => navigate("/dashboard")} />
             </ProtectedRoute>
           }
         />
@@ -178,7 +183,7 @@ export default function App() {
           path="/builder/:projectId"
           element={
             <ProtectedRoute>
-              <Builder token={token} onBack={() => navigate("/dashboard")} />
+              <BuilderRoute token={token} onBack={() => navigate("/dashboard")} />
             </ProtectedRoute>
           }
         />

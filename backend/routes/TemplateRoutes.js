@@ -1,20 +1,13 @@
 import express from 'express';
-import { 
-    getAllTemplates, 
-    getTemplateById, 
-    useTemplate,
-    createTemplate 
-} from '../controllers/TemplateController.js';
-import { verifyToken } from '../middlewares/AuthMiddleware.js';
+import { getAllTemplates, getTemplateById, useTemplate, createTemplate } from '../controllers/TemplateController.js';
+import { verifyToken, requireAdmin } from '../middlewares/AuthMiddleware.js';
+import { validateObjectId } from '../middlewares/validateObjectId.js';
 
 const router = express.Router();
 
-// Public routes - anyone can view templates
 router.get('/', getAllTemplates);
-router.get('/:id', getTemplateById);
-
-// Protected routes - require authentication
-router.post('/:id/use', verifyToken, useTemplate);
-router.post('/', verifyToken, createTemplate);
+router.get('/:id', validateObjectId, getTemplateById);
+router.post('/:id/use', validateObjectId, verifyToken, useTemplate);
+router.post('/', verifyToken, requireAdmin, createTemplate);
 
 export default router;

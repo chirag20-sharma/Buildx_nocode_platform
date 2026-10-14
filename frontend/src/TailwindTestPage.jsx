@@ -6,47 +6,47 @@ export default function TailwindTestPage() {
   const [inputValue, setInputValue] = useState("");
 
   return (
-    <div className="min-h-screen bg-[#07070c] text-[#f0f0ff] font-sans antialiased selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-[#f8f8fb] text-[#0f0f1a] font-sans antialiased selection:bg-indigo-500 selection:text-white">
       {/* ── Top Header / Nav ── */}
-      <header className="sticky top-0 z-50 bg-[#0c0c16]/90 backdrop-blur-md border-b border-white/[0.08] px-6 lg:px-12 py-4">
+      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-black/[0.07] px-6 lg:px-12 py-4 shadow-xs">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center font-extrabold text-white text-base shadow-[0_0_20px_rgba(99,102,241,0.5)]">
+            <span className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center font-extrabold text-white text-base shadow-[0_4px_12px_rgba(99,102,241,0.4)]">
               B
             </span>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-base font-bold text-white tracking-tight">BuildX</span>
-                <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                <span className="text-base font-bold text-[#0f0f1a] tracking-tight">BuildX</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
                   Tailwind v4 Test Lab
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400">Independent Styling & Utility Verification Page</p>
+              <p className="text-[11px] text-slate-500">Independent Styling & Utility Verification Page</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
               to="/"
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.05] transition"
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-black/[0.05] transition"
             >
               ← Landing
             </Link>
             <Link
               to="/signup"
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.05] transition"
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-black/[0.05] transition"
             >
               Sign Up
             </Link>
             <Link
               to="/signin"
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.05] transition"
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-black/[0.05] transition"
             >
               Sign In
             </Link>
             <Link
               to="/dashboard"
-              className="text-xs font-bold px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)] transition"
+              className="text-xs font-bold px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_4px_12px_rgba(99,102,241,0.35)] transition"
             >
               Dashboard
             </Link>

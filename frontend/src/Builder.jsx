@@ -1,11 +1,30 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, createContext, useContext } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import "./builder.css";
 import { API_BASE as API } from "./api.js";
-import { COMPONENT_GROUPS } from "./componentLibrary.js";
+import { COMPONENT_GROUPS, SUPPORTED_COMPONENT_TYPES } from "./componentLibrary.js";
 import { useHistory } from "./hooks/useHistory.js";
 const GRID = 8;
 const snap = (v, step = GRID) => Math.round(v / step) * step;
+
+export function toCSSJustify(val) {
+  if (val === "between") return "space-between";
+  if (val === "around") return "space-around";
+  if (val === "evenly") return "space-evenly";
+  if (val === "start") return "flex-start";
+  if (val === "end") return "flex-end";
+  if (val === "center") return "center";
+  return val || "flex-start";
+}
+
+export function toCSSAlign(val) {
+  if (val === "start") return "flex-start";
+  if (val === "end") return "flex-end";
+  if (val === "center") return "center";
+  if (val === "stretch") return "stretch";
+  if (val === "baseline") return "baseline";
+  return val || "stretch";
+}
 
 function safeText(value, fallback = "") {
   if (value === null || value === undefined) return fallback;
@@ -51,6 +70,8 @@ function sanitizeComponentProps(type, props = {}) {
         fontSize: Number.isFinite(Number(next.fontSize)) ? Number(next.fontSize) : 16,
         color: safeText(next.color, getReadableTextColor(next.bg || "#ffffff", "#0f172a", "#f8fafc")),
         fontWeight: next.fontWeight || "400",
+        href: safeText(next.href, ""),
+        target: next.target || "_self",
       };
     case "heading":
       return {
@@ -59,11 +80,15 @@ function sanitizeComponentProps(type, props = {}) {
         fontSize: Number.isFinite(Number(next.fontSize)) ? Number(next.fontSize) : 32,
         color: safeText(next.color, getReadableTextColor(next.bg || "#ffffff", "#0f172a", "#f8fafc")),
         fontWeight: next.fontWeight || "700",
+        href: safeText(next.href, ""),
+        target: next.target || "_self",
       };
     case "button":
       return {
         ...next,
         text: safeText(next.text, "Button"),
+        href: safeText(next.href, ""),
+        target: next.target || "_self",
         bg: safeText(next.bg, "#6366f1"),
         color: safeText(next.color, "#ffffff"),
         radius: Number.isFinite(Number(next.radius)) ? Number(next.radius) : 8,
@@ -72,7 +97,10 @@ function sanitizeComponentProps(type, props = {}) {
       return {
         ...next,
         brand: safeText(next.brand, "Brand"),
+        brandUrl: safeText(next.brandUrl, ""),
         links: next.links || "Home, About, Contact",
+        linkUrls: safeText(next.linkUrls, ""),
+        target: next.target || "_self",
         bg: safeText(next.bg, "#0f172a"),
         color: safeText(next.color, getReadableTextColor(next.bg || "#0f172a", "#0f172a", "#f8fafc")),
       };
@@ -80,8 +108,14 @@ function sanitizeComponentProps(type, props = {}) {
       return {
         ...next,
         text: safeText(next.text, "© 2026 Your Company. All rights reserved."),
+        href: safeText(next.href, ""),
+        target: next.target || "_self",
         bg: safeText(next.bg, "#0f172a"),
         color: safeText(next.color, getReadableTextColor(next.bg || "#0f172a", "#0f172a", "#f8fafc")),
+        pinBottom: next.pinBottom !== undefined ? Boolean(next.pinBottom) : true,
+        position: next.position || (next.pinBottom !== false ? "push-bottom" : "normal"),
+        marginTop: next.marginTop !== undefined ? next.marginTop : undefined,
+        marginBottom: next.marginBottom !== undefined ? next.marginBottom : undefined,
       };
     case "hero":
       return {
@@ -89,6 +123,8 @@ function sanitizeComponentProps(type, props = {}) {
         heading: safeText(next.heading, "Your Big Headline"),
         subtext: safeText(next.subtext, "Supporting description text."),
         cta: safeText(next.cta, "Get Started"),
+        ctaHref: safeText(next.ctaHref, ""),
+        target: next.target || "_self",
         bg: safeText(next.bg, "#0f172a"),
         color: safeText(next.color, getReadableTextColor(next.bg || "#0f172a", "#0f172a", "#f8fafc")),
       };
@@ -97,6 +133,8 @@ function sanitizeComponentProps(type, props = {}) {
         ...next,
         title: safeText(next.title, "Card Title"),
         body: safeText(next.body, "Card description goes here."),
+        href: safeText(next.href, ""),
+        target: next.target || "_self",
         bg: safeText(next.bg, "#ffffff"),
         radius: Number.isFinite(Number(next.radius)) ? Number(next.radius) : 12,
       };
@@ -104,6 +142,8 @@ function sanitizeComponentProps(type, props = {}) {
       return {
         ...next,
         text: safeText(next.text, "New"),
+        href: safeText(next.href, ""),
+        target: next.target || "_self",
         bg: safeText(next.bg, "#6366f1"),
         color: safeText(next.color, "#ffffff"),
       };
@@ -181,46 +221,207 @@ function sanitizeComponentProps(type, props = {}) {
       return {
         ...next,
         bg: safeText(next.bg, type === "section" ? "#f8fafc" : type === "container" ? "#ffffff" : "#f8fafc"),
+        layout: ["stack", "row", "grid", "freeform"].includes(next.layout) ? next.layout : (type === "columns" ? "grid" : "stack"),
+        gap: Number.isFinite(Number(next.gap)) ? Number(next.gap) : 16,
+        padding: Number.isFinite(Number(next.padding)) ? Number(next.padding) : (type === "section" ? 32 : 16),
+        align: ["start", "center", "end", "stretch"].includes(next.align) ? next.align : "stretch",
+        justify: ["start", "center", "end", "between", "around", "evenly"].includes(next.justify) ? next.justify : "start",
+        cols: Math.max(1, Math.min(6, Number(next.cols || (type === "columns" ? 2 : 3)))),
+        maxWidth: next.maxWidth ? String(next.maxWidth) : (type === "container" ? "1200px" : "100%"),
+        radius: Number.isFinite(Number(next.radius)) ? Number(next.radius) : (type === "container" ? 8 : 0),
+        borderColor: safeText(next.borderColor, "transparent"),
+        position: next.position || (next.pinBottom ? "push-bottom" : "normal"),
+        pinBottom: Boolean(next.pinBottom || next.position === "push-bottom"),
+        flexGrow: Boolean(next.flexGrow),
+        marginTop: next.marginTop !== undefined ? next.marginTop : undefined,
+        marginBottom: next.marginBottom !== undefined ? next.marginBottom : undefined,
       };
     default:
-      return next;
+      return {
+        ...next,
+        pinBottom: Boolean(next.pinBottom || next.position === "push-bottom"),
+        position: next.position || (next.pinBottom ? "push-bottom" : "normal"),
+      };
   }
 }
 
-function serializeNodeForStorage(node) {
-  const safeType = ["button","input","textarea","text","heading","image","imagegrid","video","container","section","columns","formblock","navbar","footer","hero","card","badge","alert","tabs","productcard","pricingcard","testimonial","blogcard","statcard","divider","spacer","select","checkbox"].includes(node?.type) ? node.type : "container";
+function serializeNodeForStorage(node, index = 0) {
+  const safeType = SUPPORTED_COMPONENT_TYPES.includes(node?.type) ? node.type : "container";
 
   return {
-    id: node?.id || `node-${Date.now()}`,
+    id: node?.id || `node-${Date.now()}-${index}`,
     type: safeType,
     parentId: node?.parentId || null,
+    order: Number.isFinite(Number(node?.order)) ? Number(node.order) : index,
     properties: sanitizeComponentProps(safeType, node?.props || {}),
     position: {
       x: Number.isFinite(Number(node?.x)) ? Number(node.x) : 0,
       y: Number.isFinite(Number(node?.y)) ? Number(node.y) : 0,
     },
     styles: {
-      width: Number.isFinite(Number(node?.w)) ? Number(node.w) : 280,
-      height: Number.isFinite(Number(node?.h)) ? Number(node.h) : 60,
+      width: Number.isFinite(Number(node?.w)) ? Number(node.w) : (safeType === "section" ? 1200 : 280),
+      height: Number.isFinite(Number(node?.h)) ? Number(node.h) : (safeType === "section" ? 200 : 60),
     },
   };
 }
 
 function restoreNodeFromProject(component, index = 0) {
-  const type = component?.type || "container";
+  const type = SUPPORTED_COMPONENT_TYPES.includes(component?.type) ? component.type : "container";
   return {
     id: component?.id || `node-${index}`,
     type,
-    x: Number.isFinite(Number(component?.position?.x)) ? Number(component.position.x) : index * 20,
-    y: Number.isFinite(Number(component?.position?.y)) ? Number(component.position.y) : index * 60,
-    w: Number.isFinite(Number(component?.styles?.width)) ? Number(component.styles.width) : 280,
-    h: Number.isFinite(Number(component?.styles?.height)) ? Number(component.styles.height) : 60,
+    x: Number.isFinite(Number(component?.position?.x)) ? Number(component.position.x) : 0,
+    y: Number.isFinite(Number(component?.position?.y)) ? Number(component.position.y) : 0,
+    w: Number.isFinite(Number(component?.styles?.width)) ? Number(component.styles.width) : (type === "section" ? 1200 : 280),
+    h: Number.isFinite(Number(component?.styles?.height)) ? Number(component.styles.height) : (type === "section" ? 200 : 60),
     props: sanitizeComponentProps(type, component?.properties || {}),
     parentId: component?.parentId || null,
+    order: Number.isFinite(Number(component?.order)) ? Number(component.order) : index,
     locked: false,
     hidden: false,
     name: component?.properties?.text || component?.properties?.heading || component?.properties?.title || component?.properties?.brand || component?.type || "Component",
   };
+}
+
+// ─── Hierarchy & Tree Helpers ─────────────────────────────────────────────
+
+// Check if targetId is a descendant of ancestorId (prevents circular nesting)
+function isDescendant(nodes, ancestorId, targetId) {
+  if (!ancestorId || !targetId) return false;
+  if (ancestorId === targetId) return true;
+  let curr = (nodes || []).find(n => n.id === targetId);
+  while (curr && curr.parentId) {
+    if (curr.parentId === ancestorId) return true;
+    curr = (nodes || []).find(n => n.id === curr.parentId);
+  }
+  return false;
+}
+
+// Get all descendant IDs of a node (including nested children)
+function getAllDescendantIds(nodes, nodeId) {
+  const ids = new Set();
+  function collect(id) {
+    const children = (nodes || []).filter(n => n.parentId === id);
+    for (const c of children) {
+      ids.add(c.id);
+      collect(c.id);
+    }
+  }
+  collect(nodeId);
+  return ids;
+}
+
+// Recursively duplicate a node and all its descendants with unique IDs
+function duplicateNodeRecursive(nodes, rootId) {
+  const root = (nodes || []).find(n => n.id === rootId);
+  if (!root) return { updatedNodes: nodes, newRootId: null };
+
+  const time = Date.now();
+  let counter = 0;
+
+  function clone(node, newParentId) {
+    const newId = `${node.type}-${time}-${++counter}`;
+    const clonedNode = {
+      ...node,
+      id: newId,
+      parentId: newParentId,
+      order: Number(node.order ?? 0) + 1,
+      name: `${node.name || node.type} (Copy)`,
+      x: node.x + 20,
+      y: node.y + 20,
+      props: JSON.parse(JSON.stringify(node.props || {})),
+    };
+
+    const children = (nodes || []).filter(n => n.parentId === node.id);
+    const clonedChildren = children.flatMap(c => clone(c, newId));
+    return [clonedNode, ...clonedChildren];
+  }
+
+  const newNodes = clone(root, root.parentId);
+  const rootIndex = nodes.findIndex(n => n.id === rootId);
+  const result = [...nodes];
+  result.splice(rootIndex + 1, 0, ...newNodes);
+
+  // Normalize sibling orders for root's parent
+  const parentId = root.parentId ?? null;
+  const parentSiblings = result.filter(n => (n.parentId ?? null) === parentId);
+  parentSiblings.forEach((s, idx) => { s.order = idx; });
+
+  return { updatedNodes: result, newRootId: newNodes[0].id };
+}
+
+// Reparent and reorder nodes safely
+function reorderNodes(nodes, movedId, targetParentId, insertIndex = null) {
+  if (!movedId) return nodes;
+  if (targetParentId && (movedId === targetParentId || isDescendant(nodes, movedId, targetParentId))) {
+    return nodes; // Prevent self-nesting and circular nesting
+  }
+
+  const movedNode = (nodes || []).find(n => n.id === movedId);
+  if (!movedNode) return nodes;
+
+  const oldParentId = movedNode.parentId ?? null;
+  const isSameParent = oldParentId === targetParentId;
+
+  if (isSameParent) {
+    const currentSiblings = (nodes || [])
+      .filter(n => (n.parentId ?? null) === targetParentId)
+      .sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
+
+    const oldIndex = currentSiblings.findIndex(n => n.id === movedId);
+    if (oldIndex === -1) return nodes;
+
+    // Adjust for same-parent forward move off-by-one bug
+    const effectiveInsertIndex = insertIndex !== null && insertIndex !== undefined
+      ? (insertIndex > oldIndex ? insertIndex - 1 : insertIndex)
+      : currentSiblings.length - 1;
+
+    const remainingSiblings = currentSiblings.filter(n => n.id !== movedId);
+    const targetIdx = Math.max(0, Math.min(effectiveInsertIndex, remainingSiblings.length));
+
+    const updatedMoved = { ...movedNode, parentId: targetParentId, order: targetIdx };
+    remainingSiblings.splice(targetIdx, 0, updatedMoved);
+
+    const orderMap = new Map();
+    remainingSiblings.forEach((s, idx) => orderMap.set(s.id, idx));
+
+    return (nodes || []).map(n => orderMap.has(n.id) ? { ...n, order: orderMap.get(n.id) } : n);
+  }
+
+  // Cross-parent reparenting: normalize BOTH previous and destination parent siblings
+  const oldSiblings = (nodes || [])
+    .filter(n => (n.parentId ?? null) === oldParentId && n.id !== movedId)
+    .sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
+
+  const targetSiblings = (nodes || [])
+    .filter(n => (n.parentId ?? null) === targetParentId && n.id !== movedId)
+    .sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
+
+  const targetIdx = insertIndex !== null && insertIndex !== undefined
+    ? Math.max(0, Math.min(insertIndex, targetSiblings.length))
+    : targetSiblings.length;
+
+  const updatedMovedNode = {
+    ...movedNode,
+    parentId: targetParentId,
+    order: targetIdx,
+  };
+
+  targetSiblings.splice(targetIdx, 0, updatedMovedNode);
+
+  const orderMap = new Map();
+  oldSiblings.forEach((s, idx) => orderMap.set(s.id, idx));
+  targetSiblings.forEach((s, idx) => orderMap.set(s.id, idx));
+
+  return (nodes || []).map(n => {
+    if (n.id === movedId) {
+      return { ...updatedMovedNode, order: orderMap.get(n.id) ?? targetIdx };
+    }
+    if (orderMap.has(n.id)) {
+      return { ...n, order: orderMap.get(n.id) };
+    }
+    return n;
+  });
 }
 
 // ─── History (Undo/Redo) — see hooks/useHistory.js ──────────────────────────
@@ -306,9 +507,16 @@ function renderNodeContent(node, updateNode, isPreview = false, allNodes = []) {
     case "button":
       return (
         <button
-          contentEditable
+          contentEditable={!isPreview}
           suppressContentEditableWarning
           style={{ background: p.bg || "#6366f1", color: p.color || "#ffffff", border: "none", borderRadius: p.radius || 8, padding: "0 20px", height: "100%", width: "100%", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
+          onClick={e => {
+            if (!isPreview) return;
+            if (p.href) {
+              if (p.target === "_blank") window.open(p.href, "_blank", "noopener,noreferrer");
+              else window.location.href = p.href;
+            }
+          }}
           onBlur={e => {
             const newText = e.target.innerText;
             if (newText !== p.text) {
@@ -384,11 +592,34 @@ function renderNodeContent(node, updateNode, isPreview = false, allNodes = []) {
       );
     case "navbar": {
       const links = normalizeList(p.links, ["Home", "About", "Contact"]);
+      const linkUrls = typeof p.linkUrls === "string" ? p.linkUrls.split(",").map(l => l.trim()) : [];
       return (
         <div style={{ background: p.bg || "#0f172a", color: p.color || getReadableTextColor(p.bg || "#0f172a", "#0f172a", "#f8fafc"), width: "100%", height: "100%", display: "flex", alignItems: "center", padding: "0 20px", gap: 24, fontSize: 14, fontWeight: 600 }}>
-          <span style={{ fontWeight: 800, fontSize: 16 }}>{safeText(p.brand, "Brand")}</span>
+          <a
+            href={p.brandUrl || "#"}
+            onClick={e => { if (!isPreview) e.preventDefault(); }}
+            target={p.target || "_self"}
+            rel={p.target === "_blank" ? "noopener noreferrer" : undefined}
+            style={{ fontWeight: 800, fontSize: 16, color: "inherit", textDecoration: "none", cursor: isPreview ? "pointer" : "default" }}
+          >
+            {safeText(p.brand, "Brand")}
+          </a>
           <div style={{ display: "flex", gap: 18, alignItems: "center", opacity: 0.8, fontSize: 12 }}>
-            {links.map((link, index) => <span key={`${link}-${index}`}>{link}</span>)}
+            {links.map((link, index) => {
+              const url = linkUrls[index] || `#${link.toLowerCase().replace(/\s+/g, '-')}`;
+              return (
+                <a
+                  key={`${link}-${index}`}
+                  href={url}
+                  onClick={e => { if (!isPreview) e.preventDefault(); }}
+                  target={p.target || "_self"}
+                  rel={p.target === "_blank" ? "noopener noreferrer" : undefined}
+                  style={{ color: "inherit", textDecoration: "none", cursor: isPreview ? "pointer" : "default" }}
+                >
+                  {link}
+                </a>
+              );
+            })}
           </div>
         </div>
       );
@@ -396,29 +627,86 @@ function renderNodeContent(node, updateNode, isPreview = false, allNodes = []) {
     case "footer":
       return <div style={{ background: p.bg || "#0f172a", color: p.color || getReadableTextColor(p.bg || "#0f172a", "#0f172a", "#f8fafc"), width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>{safeText(p.text, "© 2026 Your Company. All rights reserved.")}</div>;
     case "hero":
-      return <div style={{ background: p.bg || "#0f172a", color: p.color || "#f1f5f9", width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px", textAlign: "center", gap: 10 }}><div style={{ fontSize: Math.min(28, (p.fontSize || 36)), fontWeight: 800, lineHeight: 1.2 }}>{p.heading || "Hero Heading"}</div><div style={{ fontSize: 13, opacity: 0.7, maxWidth: 400 }}>{p.subtext || "Subtext"}</div><button style={{ marginTop: 8, background: "#6366f1", color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{p.cta || "Get Started"}</button></div>;
+      return (
+        <div style={{ background: p.bg || "#0f172a", color: p.color || "#f1f5f9", width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px", textAlign: "center", gap: 10 }}>
+          <div style={{ fontSize: Math.min(28, (p.fontSize || 36)), fontWeight: 800, lineHeight: 1.2 }}>{p.heading || "Hero Heading"}</div>
+          <div style={{ fontSize: 13, opacity: 0.7, maxWidth: 400 }}>{p.subtext || "Subtext"}</div>
+          <button
+            onClick={e => {
+              if (!isPreview) return;
+              if (p.ctaHref) {
+                if (p.target === "_blank") window.open(p.ctaHref, "_blank", "noopener,noreferrer");
+                else window.location.href = p.ctaHref;
+              }
+            }}
+            style={{ marginTop: 8, background: "#6366f1", color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+          >
+            {p.cta || "Get Started"}
+          </button>
+        </div>
+      );
     case "card":
       return <div style={{ background: p.bg || "#ffffff", width: "100%", height: "100%", borderRadius: p.radius || 12, padding: "16px", display: "flex", flexDirection: "column", gap: 6, border: "1px solid #e2e8f0" }}><div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>{p.title || "Card Title"}</div><div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>{p.body || "Card description."}</div></div>;
-    case "section":
+    case "section": {
+      const isRow = p.layout === "row";
+      const isGrid = p.layout === "grid";
+      const cols = Math.max(1, Number(p.cols || 3));
       return (
-        <div style={{ background: p.bg || "#f8fafc", width: "100%", height: "100%", border: "1px dashed #cbd5e1", borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 10, overflow: "hidden" }}>
+        <div style={{
+          background: p.bg || "#f8fafc",
+          width: "100%",
+          minHeight: 100,
+          border: isPreview ? (p.borderColor && p.borderColor !== "transparent" ? `1px solid ${p.borderColor}` : undefined) : "1px dashed #cbd5e1",
+          borderRadius: p.radius ? `${p.radius}px` : 10,
+          padding: p.padding ?? 24,
+          display: isGrid ? "grid" : "flex",
+          gridTemplateColumns: isGrid ? `repeat(${cols}, minmax(0, 1fr))` : undefined,
+          flexDirection: isRow ? "row" : "column",
+          flexWrap: isRow ? "wrap" : undefined,
+          alignItems: p.align || "stretch",
+          justifyContent: p.justify || "start",
+          gap: p.gap ?? 16,
+          overflow: "hidden",
+        }}>
           {childNodes.length > 0 ? childNodes.map((child) => (
-            <div key={child.id} style={{ position: "relative", minHeight: 24 }}>
+            <div key={child.id} style={{ position: "relative", minHeight: 24, width: isRow ? "auto" : "100%" }}>
               {renderNodeContent(child, updateNode, isPreview, allNodes)}
             </div>
-          )) : <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>Section</span>}
+          )) : (!isPreview && <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>Section</span>)}
         </div>
       );
-    case "container":
+    }
+    case "container": {
+      const isRow = p.layout === "row";
+      const isGrid = p.layout === "grid";
+      const cols = Math.max(1, Number(p.cols || 3));
       return (
-        <div style={{ background: p.bg || "#ffffff", width: "100%", height: "100%", border: "1px dashed #cbd5e1", borderRadius: 6, padding: 10, display: "flex", flexDirection: "column", gap: 8, overflow: "hidden" }}>
+        <div style={{
+          background: p.bg || "#ffffff",
+          width: "100%",
+          maxWidth: p.maxWidth || "1200px",
+          margin: "0 auto",
+          minHeight: 60,
+          border: isPreview ? (p.borderColor && p.borderColor !== "transparent" ? `1px solid ${p.borderColor}` : undefined) : "1px dashed #cbd5e1",
+          borderRadius: p.radius ? `${p.radius}px` : 8,
+          padding: p.padding ?? 16,
+          display: isGrid ? "grid" : "flex",
+          gridTemplateColumns: isGrid ? `repeat(${cols}, minmax(0, 1fr))` : undefined,
+          flexDirection: isRow ? "row" : "column",
+          flexWrap: isRow ? "wrap" : undefined,
+          alignItems: p.align || "stretch",
+          justifyContent: p.justify || "start",
+          gap: p.gap ?? 12,
+          overflow: "hidden",
+        }}>
           {childNodes.length > 0 ? childNodes.map((child) => (
-            <div key={child.id} style={{ position: "relative", minHeight: 24 }}>
+            <div key={child.id} style={{ position: "relative", minHeight: 24, width: isRow ? "auto" : "100%" }}>
               {renderNodeContent(child, updateNode, isPreview, allNodes)}
             </div>
-          )) : <span style={{ fontSize: 11, color: "#94a3b8" }}>Container</span>}
+          )) : (!isPreview && <span style={{ fontSize: 11, color: "#94a3b8" }}>Container</span>)}
         </div>
       );
+    }
     case "divider":
       return <div style={{ width: "100%", height: "100%", background: p.color || "#e2e8f0", borderRadius: 2 }} />;
     case "spacer":
@@ -566,10 +854,10 @@ function renderNodeContent(node, updateNode, isPreview = false, allNodes = []) {
       const columnCount = Math.max(1, Number(p.cols || 2));
       const columnChildren = childNodes.length > 0 ? childNodes : Array.from({ length: columnCount }, (_, i) => ({ id: `${node.id}-col-${i}`, type: "container", parentId: node.id, props: { bg: "#f8fafc" } }));
       return (
-        <div style={{ display: "flex", gap: 8, width: "100%", height: "100%", padding: 4 }}>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`, gap: p.gap ?? 12, width: "100%", padding: p.padding ?? 8 }}>
           {columnChildren.map((child, index) => (
-            <div key={child.id || `${node.id}-col-${index}`} style={{ flex: 1, background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: 6, padding: 8, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-              {child.type === "container" || child.type === "section" || child.type === "text" || child.type === "heading" || child.type === "button" ? renderNodeContent({ ...child, props: sanitizeComponentProps(child.type, child.props || {}) }, updateNode, isPreview, allNodes) : <span style={{ fontSize: 11, color: "#94a3b8" }}>Col {index + 1}</span>}
+            <div key={child.id || `${node.id}-col-${index}`} style={{ minWidth: 0, background: child.props?.bg || "#f8fafc", border: isPreview ? undefined : "1px dashed #cbd5e1", borderRadius: 6, padding: child.props?.padding ?? 8, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              {renderNodeContent({ ...child, props: sanitizeComponentProps(child.type, child.props || {}) }, updateNode, isPreview, allNodes)}
             </div>
           ))}
         </div>
@@ -580,8 +868,89 @@ function renderNodeContent(node, updateNode, isPreview = false, allNodes = []) {
   }
 }
 
-// ─── Properties Panel ─────────────────────────────────────────────────────
-function PropertiesPanel({ node, onChange, onDelete, onDuplicate }) {
+// ─── Properties Panel Context & Control Components ───────────────────────
+const PropContext = createContext({ p: {}, set: () => {} });
+
+function PropRow({ label, children }) {
+  return (
+    <div className="bx-prop-row">
+      <span className="bx-prop-label">{label}</span>
+      <div className="bx-prop-control">{children}</div>
+    </div>
+  );
+}
+
+function TextInput({ k, placeholder, type = "text" }) {
+  const { p, set } = useContext(PropContext);
+  return (
+    <input
+      type={type}
+      className="bx-prop-input"
+      value={p[k] ?? ""}
+      placeholder={placeholder || k}
+      onChange={e => set(k, e.target.value)}
+    />
+  );
+}
+
+function NumberInput({ k, min = 0, max = 9999, step = 1 }) {
+  const { p, set } = useContext(PropContext);
+  return (
+    <input
+      className="bx-prop-input bx-prop-number"
+      type="number"
+      value={p[k] ?? ""}
+      min={min}
+      max={max}
+      step={step}
+      onChange={e => {
+        const raw = e.target.value;
+        if (raw === "") {
+          set(k, "");
+          return;
+        }
+        const val = Number(raw);
+        set(k, Number.isFinite(val) ? val : min);
+      }}
+      onBlur={() => {
+        if (p[k] === "" || p[k] === undefined) {
+          set(k, min);
+        } else {
+          const val = Number(p[k]);
+          if (Number.isFinite(val)) {
+            set(k, Math.max(min, Math.min(max, val)));
+          }
+        }
+      }}
+    />
+  );
+}
+
+function ColorInput({ k }) {
+  const { p, set } = useContext(PropContext);
+  const colorVal = p[k] || "#000000";
+  const safeHex = typeof colorVal === "string" && colorVal.startsWith("#") && (colorVal.length === 7 || colorVal.length === 4)
+    ? colorVal
+    : "#000000";
+  return (
+    <div className="bx-prop-color-row">
+      <input
+        type="color"
+        className="bx-prop-color"
+        value={safeHex}
+        onChange={e => set(k, e.target.value)}
+      />
+      <input
+        className="bx-prop-input"
+        value={p[k] ?? ""}
+        placeholder="#000000"
+        onChange={e => set(k, e.target.value)}
+      />
+    </div>
+  );
+}
+
+function PropertiesPanel({ node, nodes, onChange, onDelete, onDuplicate }) {
   if (!node) {
     return (
       <div className="bx-props-empty">
@@ -593,30 +962,6 @@ function PropertiesPanel({ node, onChange, onDelete, onDuplicate }) {
 
   const p = node.props || {};
   const set = (key, val) => onChange({ ...node, props: { ...p, [key]: val } });
-
-  const PropRow = ({ label, children }) => (
-    <div className="bx-prop-row">
-      <span className="bx-prop-label">{label}</span>
-      <div className="bx-prop-control">{children}</div>
-    </div>
-  );
-
-  const TextInput = ({ k, placeholder }) => (
-    <input className="bx-prop-input" value={p[k] || ""} placeholder={placeholder || k}
-      onChange={e => set(k, e.target.value)} />
-  );
-
-  const NumberInput = ({ k, min, max, step }) => (
-    <input className="bx-prop-input bx-prop-number" type="number" value={p[k] || 0}
-      min={min} max={max} step={step || 1} onChange={e => set(k, +e.target.value)} />
-  );
-
-  const ColorInput = ({ k }) => (
-    <div className="bx-prop-color-row">
-      <input type="color" className="bx-prop-color" value={p[k] || "#000000"} onChange={e => set(k, e.target.value)} />
-      <input className="bx-prop-input" value={p[k] || ""} placeholder="#000000" onChange={e => set(k, e.target.value)} />
-    </div>
-  );
 
   const renderTypeProps = () => {
     switch (node.type) {
@@ -638,6 +983,15 @@ function PropertiesPanel({ node, onChange, onDelete, onDuplicate }) {
               ))}
             </div>
           </PropRow>
+          <PropRow label="Link (href)"><TextInput k="href" placeholder="https://... (optional)" /></PropRow>
+          {p.href && (
+            <PropRow label="Open in">
+              <select className="bx-prop-select" value={p.target || "_self"} onChange={e => set("target", e.target.value)}>
+                <option value="_self">Same tab (_self)</option>
+                <option value="_blank">New tab (_blank)</option>
+              </select>
+            </PropRow>
+          )}
         </>;
       case "button":
         return <>
@@ -645,7 +999,13 @@ function PropertiesPanel({ node, onChange, onDelete, onDuplicate }) {
           <PropRow label="BG"><ColorInput k="bg" /></PropRow>
           <PropRow label="Color"><ColorInput k="color" /></PropRow>
           <PropRow label="Radius"><NumberInput k="radius" min={0} max={50} /></PropRow>
-          <PropRow label="Link"><TextInput k="href" placeholder="https://..." /></PropRow>
+          <PropRow label="Link (href)"><TextInput k="href" placeholder="https://..." /></PropRow>
+          <PropRow label="Open in">
+            <select className="bx-prop-select" value={p.target || "_self"} onChange={e => set("target", e.target.value)}>
+              <option value="_self">Same tab (_self)</option>
+              <option value="_blank">New tab (_blank)</option>
+            </select>
+          </PropRow>
         </>;
       case "image":
         return <>
@@ -657,6 +1017,15 @@ function PropertiesPanel({ node, onChange, onDelete, onDuplicate }) {
             </select>
           </PropRow>
           <PropRow label="Radius"><NumberInput k="radius" min={0} max={100} /></PropRow>
+          <PropRow label="Link (href)"><TextInput k="href" placeholder="https://... (optional)" /></PropRow>
+          {p.href && (
+            <PropRow label="Open in">
+              <select className="bx-prop-select" value={p.target || "_self"} onChange={e => set("target", e.target.value)}>
+                <option value="_self">Same tab (_self)</option>
+                <option value="_blank">New tab (_blank)</option>
+              </select>
+            </PropRow>
+          )}
           <PropRow label="Upload">
             <label className="bx-prop-upload-btn">
               Browse file
@@ -734,7 +1103,15 @@ function PropertiesPanel({ node, onChange, onDelete, onDuplicate }) {
       case "navbar":
         return <>
           <PropRow label="Brand"><TextInput k="brand" /></PropRow>
+          <PropRow label="Brand Link"><TextInput k="brandUrl" placeholder="/ or https://..." /></PropRow>
           <PropRow label="Links"><TextInput k="links" placeholder="Home, About, Contact" /></PropRow>
+          <PropRow label="Link URLs"><TextInput k="linkUrls" placeholder="/home, /about, /contact" /></PropRow>
+          <PropRow label="Open in">
+            <select className="bx-prop-select" value={p.target || "_self"} onChange={e => set("target", e.target.value)}>
+              <option value="_self">Same tab (_self)</option>
+              <option value="_blank">New tab (_blank)</option>
+            </select>
+          </PropRow>
           <PropRow label="BG"><ColorInput k="bg" /></PropRow>
           <PropRow label="Color"><ColorInput k="color" /></PropRow>
         </>;
@@ -742,7 +1119,14 @@ function PropertiesPanel({ node, onChange, onDelete, onDuplicate }) {
         return <>
           <PropRow label="Heading"><TextInput k="heading" /></PropRow>
           <PropRow label="Subtext"><TextInput k="subtext" /></PropRow>
-          <PropRow label="CTA"><TextInput k="cta" /></PropRow>
+          <PropRow label="CTA Text"><TextInput k="cta" /></PropRow>
+          <PropRow label="CTA Link"><TextInput k="ctaHref" placeholder="https://... or #section" /></PropRow>
+          <PropRow label="Open in">
+            <select className="bx-prop-select" value={p.target || "_self"} onChange={e => set("target", e.target.value)}>
+              <option value="_self">Same tab (_self)</option>
+              <option value="_blank">New tab (_blank)</option>
+            </select>
+          </PropRow>
           <PropRow label="BG"><ColorInput k="bg" /></PropRow>
           <PropRow label="Color"><ColorInput k="color" /></PropRow>
         </>;
@@ -750,6 +1134,15 @@ function PropertiesPanel({ node, onChange, onDelete, onDuplicate }) {
         return <>
           <PropRow label="Title"><TextInput k="title" /></PropRow>
           <PropRow label="Body"><TextInput k="body" /></PropRow>
+          <PropRow label="Link (href)"><TextInput k="href" placeholder="https://... (optional)" /></PropRow>
+          {p.href && (
+            <PropRow label="Open in">
+              <select className="bx-prop-select" value={p.target || "_self"} onChange={e => set("target", e.target.value)}>
+                <option value="_self">Same tab (_self)</option>
+                <option value="_blank">New tab (_blank)</option>
+              </select>
+            </PropRow>
+          )}
           <PropRow label="BG"><ColorInput k="bg" /></PropRow>
           <PropRow label="Radius"><NumberInput k="radius" min={0} max={40} /></PropRow>
         </>;
@@ -759,6 +1152,15 @@ function PropertiesPanel({ node, onChange, onDelete, onDuplicate }) {
           <PropRow label="Brand"><TextInput k="brand" /></PropRow>
           <PropRow label="Price"><TextInput k="price" /></PropRow>
           <PropRow label="Rating"><NumberInput k="rating" min={0} max={5} step={0.1} /></PropRow>
+          <PropRow label="Link (href)"><TextInput k="href" placeholder="https://... (optional)" /></PropRow>
+          {p.href && (
+            <PropRow label="Open in">
+              <select className="bx-prop-select" value={p.target || "_self"} onChange={e => set("target", e.target.value)}>
+                <option value="_self">Same tab (_self)</option>
+                <option value="_blank">New tab (_blank)</option>
+              </select>
+            </PropRow>
+          )}
         </>;
       case "pricingcard":
         return <>
@@ -778,6 +1180,15 @@ function PropertiesPanel({ node, onChange, onDelete, onDuplicate }) {
           <PropRow label="Author"><TextInput k="author" /></PropRow>
           <PropRow label="Category"><TextInput k="category" /></PropRow>
           <PropRow label="Read time"><TextInput k="readTime" /></PropRow>
+          <PropRow label="Link (href)"><TextInput k="href" placeholder="https://... (optional)" /></PropRow>
+          {p.href && (
+            <PropRow label="Open in">
+              <select className="bx-prop-select" value={p.target || "_self"} onChange={e => set("target", e.target.value)}>
+                <option value="_self">Same tab (_self)</option>
+                <option value="_blank">New tab (_blank)</option>
+              </select>
+            </PropRow>
+          )}
         </>;
       case "statcard":
         return <>
@@ -802,6 +1213,15 @@ function PropertiesPanel({ node, onChange, onDelete, onDuplicate }) {
       case "badge":
         return <>
           <PropRow label="Text"><TextInput k="text" /></PropRow>
+          <PropRow label="Link (href)"><TextInput k="href" placeholder="https://... (optional)" /></PropRow>
+          {p.href && (
+            <PropRow label="Open in">
+              <select className="bx-prop-select" value={p.target || "_self"} onChange={e => set("target", e.target.value)}>
+                <option value="_self">Same tab (_self)</option>
+                <option value="_blank">New tab (_blank)</option>
+              </select>
+            </PropRow>
+          )}
           <PropRow label="BG"><ColorInput k="bg" /></PropRow>
           <PropRow label="Color"><ColorInput k="color" /></PropRow>
         </>;
@@ -848,12 +1268,152 @@ function PropertiesPanel({ node, onChange, onDelete, onDuplicate }) {
       case "footer":
         return <>
           <PropRow label="Text"><TextInput k="text" /></PropRow>
+          <PropRow label="Pin to Bottom">
+            <div className="bx-prop-segmented">
+              {[
+                { k: "off", label: "Off", action: () => { set("pinBottom", false); set("position", "normal"); } },
+                { k: "push", label: "Push", action: () => { set("pinBottom", true); set("position", "push-bottom"); } },
+                { k: "sticky", label: "Sticky", action: () => { set("pinBottom", true); set("position", "sticky-bottom"); } },
+                { k: "fixed", label: "Fixed", action: () => { set("pinBottom", true); set("position", "fixed-bottom"); } },
+              ].map(opt => {
+                const currentPos = p.position || (p.pinBottom ? "push-bottom" : "normal");
+                const isActive = opt.k === "off"
+                  ? (!p.pinBottom && currentPos === "normal")
+                  : (opt.k === "push" ? (currentPos === "push-bottom" || (p.pinBottom && currentPos === "normal")) : currentPos === `${opt.k}-bottom`);
+                return (
+                  <button
+                    key={opt.k}
+                    type="button"
+                    className={`bx-prop-segment-btn${isActive ? " active" : ""}`}
+                    onClick={opt.action}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </PropRow>
+          <PropRow label="Link (href)"><TextInput k="href" placeholder="https://... (optional)" /></PropRow>
+          {p.href && (
+            <PropRow label="Open in">
+              <select className="bx-prop-select" value={p.target || "_self"} onChange={e => set("target", e.target.value)}>
+                <option value="_self">Same tab (_self)</option>
+                <option value="_blank">New tab (_blank)</option>
+              </select>
+            </PropRow>
+          )}
           <PropRow label="BG"><ColorInput k="bg" /></PropRow>
           <PropRow label="Color"><ColorInput k="color" /></PropRow>
         </>;
       case "section":
       case "container":
-        return <PropRow label="BG"><ColorInput k="bg" /></PropRow>;
+      case "columns": {
+        const layout = p.layout || (node.type === "columns" ? "grid" : "stack");
+        return <>
+          <div style={{ marginBottom: 12 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--bx-text-secondary)", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>Layout Mode</span>
+            <div className="bx-prop-layout-selector">
+              {[
+                { m: "stack", label: "Stack", icon: "↕" },
+                { m: "row", label: "Row", icon: "↔" },
+                { m: "grid", label: "Grid", icon: "⊞" },
+                { m: "freeform", label: "Free", icon: "⤢" },
+              ].map(item => (
+                <button
+                  key={item.m}
+                  type="button"
+                  className={`bx-prop-layout-btn${layout === item.m ? " active" : ""}`}
+                  onClick={() => set("layout", item.m)}
+                  title={`Layout: ${item.label}`}
+                >
+                  <span style={{ fontSize: 13 }}>{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {layout === "grid" && (
+            <PropRow label="Columns">
+              <div className="bx-prop-segmented">
+                {[1, 2, 3, 4, 6].map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`bx-prop-segment-btn${(p.cols || 2) === c ? " active" : ""}`}
+                    onClick={() => set("cols", c)}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </PropRow>
+          )}
+          {layout !== "freeform" && (
+            <>
+              <PropRow label="Gap">
+                <NumberInput k="gap" min={0} max={64} step={4} />
+              </PropRow>
+              <PropRow label="Padding">
+                <NumberInput k="padding" min={0} max={80} step={4} />
+              </PropRow>
+              <PropRow label="Align Items">
+                <div className="bx-prop-segmented">
+                  {[
+                    { a: "start", label: "Start" },
+                    { a: "center", label: "Center" },
+                    { a: "end", label: "End" },
+                    { a: "stretch", label: "Fill" },
+                  ].map(item => (
+                    <button
+                      key={item.a}
+                      type="button"
+                      className={`bx-prop-segment-btn${(p.align || "stretch") === item.a ? " active" : ""}`}
+                      onClick={() => set("align", item.a)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </PropRow>
+              {(layout === "row" || layout === "stack") && (
+                <PropRow label="Justify">
+                  <div className="bx-prop-segmented">
+                    {[
+                      { j: "start", label: "Start" },
+                      { j: "center", label: "Center" },
+                      { j: "end", label: "End" },
+                      { j: "between", label: "Space" },
+                      { j: "around", label: "Around" },
+                    ].map(item => (
+                      <button
+                        key={item.j}
+                        type="button"
+                        className={`bx-prop-segment-btn${(p.justify || "start") === item.j ? " active" : ""}`}
+                        onClick={() => set("justify", item.j)}
+                        title={layout === "stack" ? `Vertical Justify: ${item.label}` : `Horizontal Justify: ${item.label}`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </PropRow>
+              )}
+            </>
+          )}
+          <PropRow label="Background"><ColorInput k="bg" /></PropRow>
+          {node.type === "container" && (
+            <>
+              <PropRow label="Max Width">
+                <select className="bx-prop-select" value={p.maxWidth || "1200px"} onChange={e => set("maxWidth", e.target.value)}>
+                  {["100%", "1200px", "1024px", "800px", "600px", "480px"].map(w => <option key={w} value={w}>{w}</option>)}
+                </select>
+              </PropRow>
+              <PropRow label="Radius"><NumberInput k="radius" min={0} max={32} /></PropRow>
+              <PropRow label="Border"><ColorInput k="borderColor" /></PropRow>
+            </>
+          )}
+        </>;
+      }
       case "divider":
         return <PropRow label="Color"><ColorInput k="color" /></PropRow>;
       default:
@@ -861,32 +1421,683 @@ function PropertiesPanel({ node, onChange, onDelete, onDuplicate }) {
     }
   };
 
-  return (
-    <div className="bx-props-panel">
-      <div className="bx-props-header">
-        <span className="bx-props-type">{node.type}</span>
-        <span className="bx-props-id">{node.id?.slice(-6)}</span>
-      </div>
+  const parentNode = node.parentId ? (nodes || []).find(n => n.id === node.parentId) : null;
+  const isInsideFreeform = parentNode?.props?.layout === "freeform";
+  const isLayoutContainer = node.type === "section" || node.type === "container" || node.type === "columns";
 
-      <div className="bx-props-section">
-        <div className="bx-props-section-title">Layout</div>
-        <div className="bx-prop-xywh">
-          <div className="bx-prop-xywh-item"><span>X</span><input type="number" value={node.x} onChange={e => onChange({ ...node, x: snap(+e.target.value) })} /></div>
-          <div className="bx-prop-xywh-item"><span>Y</span><input type="number" value={node.y} onChange={e => onChange({ ...node, y: snap(+e.target.value) })} /></div>
-          <div className="bx-prop-xywh-item"><span>W</span><input type="number" value={node.w} onChange={e => onChange({ ...node, w: Math.max(20, +e.target.value) })} /></div>
-          <div className="bx-prop-xywh-item"><span>H</span><input type="number" value={node.h} onChange={e => onChange({ ...node, h: Math.max(8, +e.target.value) })} /></div>
+  return (
+    <PropContext.Provider value={{ p, set }}>
+      <div className="bx-props-panel">
+        <div className="bx-props-header">
+          <span className="bx-props-type">{node.type}</span>
+          <span className="bx-props-id">{node.id?.slice(-6)}</span>
+        </div>
+
+        <div className="bx-props-section">
+          <div className="bx-props-section-title">
+            {isInsideFreeform ? "Freeform Position & Size" : "Dimensions & Sizing"}
+          </div>
+          {isInsideFreeform ? (
+            <div className="bx-prop-xywh">
+              <div className="bx-prop-xywh-item"><span>X</span><input type="number" value={node.x ?? 0} onChange={e => onChange({ ...node, x: e.target.value === "" ? 0 : Number(e.target.value) })} onBlur={() => onChange({ ...node, x: snap(Number(node.x) || 0) })} /></div>
+              <div className="bx-prop-xywh-item"><span>Y</span><input type="number" value={node.y ?? 0} onChange={e => onChange({ ...node, y: e.target.value === "" ? 0 : Number(e.target.value) })} onBlur={() => onChange({ ...node, y: snap(Number(node.y) || 0) })} /></div>
+              <div className="bx-prop-xywh-item"><span>W</span><input type="number" value={node.w ?? 20} onChange={e => onChange({ ...node, w: e.target.value === "" ? 20 : Number(e.target.value) })} onBlur={() => onChange({ ...node, w: Math.max(20, Number(node.w) || 20) })} /></div>
+              <div className="bx-prop-xywh-item"><span>H</span><input type="number" value={node.h ?? 8} onChange={e => onChange({ ...node, h: e.target.value === "" ? 8 : Number(e.target.value) })} onBlur={() => onChange({ ...node, h: Math.max(8, Number(node.h) || 8) })} /></div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {!isLayoutContainer && (
+                <PropRow label="Width Mode">
+                  <div className="bx-prop-segmented">
+                    {[
+                      { k: "auto", label: "Auto" },
+                      { k: "full", label: "Full" },
+                      { k: "custom", label: "Custom" },
+                    ].map(item => {
+                      const isFull = p.fullWidth === true;
+                      const isCustom = !p.fullWidth && Number.isFinite(node.w) && node.w > 0 && node.type !== "button" && node.type !== "badge";
+                      const isAuto = !isFull && !isCustom;
+                      const active = item.k === "full" ? isFull : (item.k === "custom" ? isCustom : isAuto);
+                      return (
+                        <button
+                          key={item.k}
+                          type="button"
+                          className={`bx-prop-segment-btn${active ? " active" : ""}`}
+                          onClick={() => {
+                            if (item.k === "full") {
+                              onChange({ ...node, props: { ...p, fullWidth: true } });
+                            } else if (item.k === "custom") {
+                              onChange({ ...node, w: node.w || 280, props: { ...p, fullWidth: false } });
+                            } else {
+                              onChange({ ...node, props: { ...p, fullWidth: false } });
+                            }
+                          }}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </PropRow>
+              )}
+              {!isLayoutContainer && !p.fullWidth && (
+                <PropRow label="Width (px)">
+                  <input
+                    type="number"
+                    className="bx-prop-input bx-prop-number"
+                    value={node.w ?? ""}
+                    placeholder="auto"
+                    min={20}
+                    max={2000}
+                    step={10}
+                    onChange={e => {
+                      const raw = e.target.value;
+                      if (raw === "") {
+                        onChange({ ...node, w: undefined });
+                      } else {
+                        const val = Number(raw);
+                        if (Number.isFinite(val)) onChange({ ...node, w: val });
+                      }
+                    }}
+                    onBlur={() => {
+                      if (node.w !== undefined && node.w !== "") {
+                        onChange({ ...node, w: Math.max(20, Math.min(2000, Number(node.w) || 20)) });
+                      }
+                    }}
+                  />
+                </PropRow>
+              )}
+              <PropRow label="Min Height">
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
+                  <input
+                    type="number"
+                    className="bx-prop-input bx-prop-number"
+                    value={node.h ?? ""}
+                    placeholder={isLayoutContainer ? (node.type === "section" ? "160" : "100") : "auto"}
+                    min={0}
+                    max={2000}
+                    step={8}
+                    onChange={e => {
+                      const raw = e.target.value;
+                      if (raw === "") {
+                        onChange({ ...node, h: undefined });
+                      } else {
+                        const val = Number(raw);
+                        if (Number.isFinite(val)) onChange({ ...node, h: val });
+                      }
+                    }}
+                    onBlur={() => {
+                      if (node.h !== undefined && node.h !== "") {
+                        onChange({ ...node, h: Math.max(0, Math.min(2000, Number(node.h) || 0)) });
+                      }
+                    }}
+                  />
+                  {isLayoutContainer && (
+                    <div style={{ display: "flex", gap: 4 }}>
+                      {[
+                        { label: "Auto", h: undefined },
+                        { label: "300px", h: 300 },
+                        { label: "600px", h: 600 },
+                      ].map(preset => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          className={`bx-prop-segment-btn${node.h === preset.h ? " active" : ""}`}
+                          style={{ flex: 1, padding: "2px 4px", fontSize: 10 }}
+                          onClick={() => onChange({ ...node, h: preset.h })}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </PropRow>
+
+              <PropRow label="Position">
+                <select
+                  className="bx-prop-select"
+                  value={p.position || (p.pinBottom ? "push-bottom" : "normal")}
+                  onChange={e => {
+                    const val = e.target.value;
+                    set("position", val);
+                    set("pinBottom", val === "push-bottom" || val.endsWith("bottom"));
+                  }}
+                >
+                  <option value="normal">Normal (Flow)</option>
+                  <option value="push-bottom">Push to Bottom (margin: auto)</option>
+                  <option value="sticky-bottom">Sticky Bottom</option>
+                  <option value="fixed-bottom">Fixed Bottom</option>
+                  <option value="sticky-top">Sticky Top</option>
+                  <option value="fixed-top">Fixed Top</option>
+                </select>
+              </PropRow>
+
+              {!isInsideFreeform && (
+                <PropRow label="Align Self">
+                  <div className="bx-prop-segmented">
+                    {[
+                      { a: "auto", label: "Auto" },
+                      { a: "flex-start", label: "Start" },
+                      { a: "center", label: "Center" },
+                      { a: "flex-end", label: "End" },
+                      { a: "stretch", label: "Fill" },
+                    ].map(item => (
+                      <button
+                        key={item.a}
+                        type="button"
+                        className={`bx-prop-segment-btn${(p.alignSelf || "auto") === item.a ? " active" : ""}`}
+                        onClick={() => set("alignSelf", item.a === "auto" ? undefined : item.a)}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </PropRow>
+              )}
+
+              {!isInsideFreeform && (
+                <PropRow label="Margin Top">
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", width: "100%" }}>
+                    <input
+                      type="text"
+                      className="bx-prop-input"
+                      value={p.marginTop ?? ""}
+                      placeholder="e.g. 40 or auto"
+                      onChange={e => set("marginTop", e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className={`bx-prop-segment-btn${p.marginTop === "auto" ? " active" : ""}`}
+                      style={{ flex: "0 0 auto", padding: "4px 8px" }}
+                      onClick={() => set("marginTop", p.marginTop === "auto" ? "" : "auto")}
+                    >
+                      Auto
+                    </button>
+                  </div>
+                </PropRow>
+              )}
+
+              {isLayoutContainer && (
+                <PropRow label="Fill Space">
+                  <div className="bx-prop-segmented">
+                    <button
+                      type="button"
+                      className={`bx-prop-segment-btn${!p.flexGrow ? " active" : ""}`}
+                      onClick={() => set("flexGrow", false)}
+                    >
+                      Auto
+                    </button>
+                    <button
+                      type="button"
+                      className={`bx-prop-segment-btn${p.flexGrow ? " active" : ""}`}
+                      onClick={() => set("flexGrow", true)}
+                      title="Expand to take available vertical space (flex: 1)"
+                    >
+                      Expand (Flex 1)
+                    </button>
+                  </div>
+                </PropRow>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="bx-props-section">
+          <div className="bx-props-section-title">Properties</div>
+          {renderTypeProps()}
+        </div>
+
+        <div className="bx-props-actions">
+          <button className="bx-prop-btn-dup" onClick={onDuplicate}>Duplicate</button>
+          <button className="bx-prop-btn-del" onClick={onDelete}>Delete</button>
         </div>
       </div>
+    </PropContext.Provider>
+  );
+}
 
-      <div className="bx-props-section">
-        <div className="bx-props-section-title">Properties</div>
-        {renderTypeProps()}
-      </div>
+// ─── Hierarchical Tree Item in Layers Panel ───────────────────────────────
+function TreeItem({ node, nodes, depth = 0, selected, setSelected, toggleHide, toggleLock, collapsedIds, setCollapsedIds }) {
+  const children = (nodes || []).filter(n => n.parentId === node.id).sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
+  const isContainer = node.type === "section" || node.type === "container" || node.type === "columns";
+  const isCollapsed = collapsedIds.has(node.id);
+  const isSel = selected === node.id;
 
-      <div className="bx-props-actions">
-        <button className="bx-prop-btn-dup" onClick={onDuplicate}>Duplicate</button>
-        <button className="bx-prop-btn-del" onClick={onDelete}>Delete</button>
+  const iconMap = {
+    section: "▬",
+    container: "▭",
+    columns: "⊟",
+    heading: "H",
+    text: "T",
+    button: "▶",
+    image: "🖼",
+    card: "▣",
+    hero: "★",
+    navbar: "☰",
+    footer: "▬",
+    input: "▭",
+    formblock: "📋",
+  };
+
+  return (
+    <>
+      <div
+        className={`bx-tree-node${isSel ? " active" : ""}${node.locked ? " locked" : ""}${node.hidden ? " hidden" : ""}`}
+        style={{ paddingLeft: depth * 14 + 8 }}
+        onClick={() => setSelected(node.id)}
+      >
+        {isContainer && children.length > 0 ? (
+          <button
+            type="button"
+            className={`bx-tree-toggle${isCollapsed ? " collapsed" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setCollapsedIds(prev => {
+                const next = new Set(prev);
+                next.has(node.id) ? next.delete(node.id) : next.add(node.id);
+                return next;
+              });
+            }}
+          >
+            ▾
+          </button>
+        ) : (
+          <span style={{ width: 14 }} />
+        )}
+        <span className="bx-tree-icon">{iconMap[node.type] || "•"}</span>
+        <span className="bx-tree-label">{node.name || node.type}</span>
+        <div className="bx-tree-actions">
+          <button
+            type="button"
+            className="bx-tree-action-btn"
+            onClick={e => { e.stopPropagation(); toggleHide(node.id); }}
+            title={node.hidden ? "Show" : "Hide"}
+          >
+            {node.hidden ? "○" : "●"}
+          </button>
+          <button
+            type="button"
+            className="bx-tree-action-btn"
+            onClick={e => { e.stopPropagation(); toggleLock(node.id); }}
+            title={node.locked ? "Unlock" : "Lock"}
+          >
+            {node.locked ? "🔒" : "🔓"}
+          </button>
+        </div>
       </div>
+      {!isCollapsed && children.map(child => (
+        <TreeItem
+          key={child.id}
+          node={child}
+          nodes={nodes}
+          depth={depth + 1}
+          selected={selected}
+          setSelected={setSelected}
+          toggleHide={toggleHide}
+          toggleLock={toggleLock}
+          collapsedIds={collapsedIds}
+          setCollapsedIds={setCollapsedIds}
+        />
+      ))}
+    </>
+  );
+}
+
+// ─── Recursive Canvas Node ────────────────────────────────────────────────
+function CanvasNode({
+  node,
+  nodes,
+  selected,
+  setSelected,
+  multiSelected,
+  setMultiSelected,
+  updateNode,
+  startDrag,
+  isPreview,
+  previewDevice,
+  dragTarget,
+  setDragTarget,
+  onDropItem,
+  onStartNodeDrag,
+  onDragEnd,
+  draggingNodeId,
+}) {
+  const p = sanitizeComponentProps(node.type, node.props || {});
+  const isContainer = node.type === "section" || node.type === "container" || node.type === "columns";
+  const isSel = selected === node.id || (multiSelected || []).includes(node.id);
+  const isChildSel = !isSel && (nodes || []).some(n => n.id === selected && isDescendant(nodes, node.id, n.id));
+  const isDirectDropTarget = dragTarget?.parentId === node.id;
+
+  const children = (nodes || [])
+    .filter(n => n.parentId === node.id && !n.hidden)
+    .sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
+
+  const layout = p.layout || (node.type === "columns" ? "grid" : "stack");
+  const gap = p.gap ?? 16;
+  const padding = p.padding ?? (node.type === "section" ? 32 : 16);
+  const alignCSS = toCSSAlign(p.align);
+  const justifyCSS = toCSSJustify(p.justify);
+  const cols = Math.max(1, Number(p.cols || (node.type === "columns" ? 2 : 3)));
+
+  let containerLayoutStyles = {};
+  if (isContainer) {
+    if (layout === "stack") {
+      containerLayoutStyles = {
+        display: "flex",
+        flexDirection: "column",
+        gap: `${gap}px`,
+        padding: `${padding}px`,
+        alignItems: alignCSS,
+        justifyContent: justifyCSS,
+      };
+    } else if (layout === "row") {
+      containerLayoutStyles = {
+        display: "flex",
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: `${gap}px`,
+        padding: `${padding}px`,
+        alignItems: alignCSS,
+        justifyContent: justifyCSS,
+      };
+    } else if (layout === "grid") {
+      const gridCols = previewDevice === "mobile" ? "1fr" : (previewDevice === "tablet" ? `repeat(${Math.min(2, cols)}, minmax(0, 1fr))` : `repeat(${cols}, minmax(0, 1fr))`);
+      containerLayoutStyles = {
+        display: "grid",
+        gridTemplateColumns: gridCols,
+        gap: `${gap}px`,
+        padding: `${padding}px`,
+        alignItems: alignCSS,
+      };
+    } else if (layout === "freeform") {
+      containerLayoutStyles = {
+        position: "relative",
+        minHeight: `${Math.max(120, Number(node.h || 240))}px`,
+        padding: 0,
+      };
+    }
+  }
+
+  const nodeStyles = {
+    background: p.bg || (node.type === "section" ? "#f8fafc" : node.type === "container" ? "#ffffff" : "transparent"),
+    borderRadius: p.radius ? `${p.radius}px` : undefined,
+    border: p.borderColor && p.borderColor !== "transparent" ? `1px solid ${p.borderColor}` : undefined,
+    opacity: draggingNodeId === node.id ? 0.35 : undefined,
+    ...containerLayoutStyles,
+  };
+
+  const parentNode = (nodes || []).find(n => n.id === node.parentId);
+
+  if (node.type === "section") {
+    nodeStyles.width = "100%";
+    nodeStyles.minHeight = `${Math.max(100, Number(node.h || 160))}px`;
+  } else if (node.type === "container") {
+    nodeStyles.width = "100%";
+    nodeStyles.maxWidth = p.maxWidth || "1200px";
+    nodeStyles.minHeight = `${Math.max(60, Number(node.h || 100))}px`;
+  } else if (!isContainer) {
+    if (parentNode?.props?.layout === "freeform") {
+      nodeStyles.position = "absolute";
+      nodeStyles.left = `${node.x}px`;
+      nodeStyles.top = `${node.y}px`;
+      nodeStyles.width = `${node.w}px`;
+      nodeStyles.height = `${node.h}px`;
+    } else {
+      if (node.type === "heading" || node.type === "text" || node.type === "divider" || node.type === "spacer" || node.type === "input" || node.type === "textarea" || node.type === "hero" || node.type === "navbar" || node.type === "footer") {
+        nodeStyles.width = "100%";
+      } else if (node.type === "button" || node.type === "badge") {
+        nodeStyles.width = p.fullWidth ? "100%" : "auto";
+        nodeStyles.display = "inline-flex";
+      } else {
+        nodeStyles.width = p.fullWidth ? "100%" : (node.w ? `${node.w}px` : "100%");
+        nodeStyles.maxWidth = "100%";
+      }
+      if (node.h) nodeStyles.minHeight = `${node.h}px`;
+    }
+  }
+
+  // ── Positioning & Pin to Bottom ──
+  const pos = p.position || (p.pinBottom ? "push-bottom" : "normal");
+  if (pos === "push-bottom" || p.pinBottom) {
+    nodeStyles.marginTop = "auto";
+  } else if (pos === "sticky-bottom") {
+    nodeStyles.position = "sticky";
+    nodeStyles.bottom = 0;
+    nodeStyles.zIndex = 30;
+  } else if (pos === "fixed-bottom") {
+    nodeStyles.position = "fixed";
+    nodeStyles.bottom = 0;
+    nodeStyles.left = 0;
+    nodeStyles.width = "100%";
+    nodeStyles.zIndex = 30;
+  } else if (pos === "sticky-top") {
+    nodeStyles.position = "sticky";
+    nodeStyles.top = 0;
+    nodeStyles.zIndex = 30;
+  } else if (pos === "fixed-top") {
+    nodeStyles.position = "fixed";
+    nodeStyles.top = 0;
+    nodeStyles.left = 0;
+    nodeStyles.width = "100%";
+    nodeStyles.zIndex = 30;
+  }
+
+  // ── Custom Margins ──
+  if (node.type === "container") {
+    const topMargin = p.marginTop !== undefined && p.marginTop !== "" ? (p.marginTop === "auto" ? "auto" : `${Number(p.marginTop) || 0}px`) : ((pos === "push-bottom" || p.pinBottom) ? "auto" : "0px");
+    const btmMargin = p.marginBottom !== undefined && p.marginBottom !== "" ? (p.marginBottom === "auto" ? "auto" : `${Number(p.marginBottom) || 0}px`) : "0px";
+    nodeStyles.margin = `${topMargin} auto ${btmMargin}`;
+  } else {
+    if (p.marginTop !== undefined && p.marginTop !== "") {
+      nodeStyles.marginTop = p.marginTop === "auto" ? "auto" : `${Number(p.marginTop) || 0}px`;
+    }
+    if (p.marginBottom !== undefined && p.marginBottom !== "") {
+      nodeStyles.marginBottom = p.marginBottom === "auto" ? "auto" : `${Number(p.marginBottom) || 0}px`;
+    }
+  }
+
+  // ── Flex Grow / Fill Space ──
+  if (p.flexGrow) {
+    nodeStyles.flex = "1 1 auto";
+  }
+
+  // ── Align Self ──
+  if (p.alignSelf && p.alignSelf !== "auto") {
+    nodeStyles.alignSelf = p.alignSelf;
+  }
+
+  const handleDragOver = (e, index) => {
+    if (isPreview || node.locked) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDragTarget({ parentId: node.id, index });
+  };
+
+  const handleDrop = (e, index) => {
+    if (isPreview || node.locked) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onDropItem(e, node.id, index);
+  };
+
+  return (
+    <div
+      id={`node-${node.id}`}
+      className={`bx-layout-node bx-node-${node.type} bx-layout-${layout}${isSel && !isPreview ? " selected" : ""}${isChildSel && !isPreview ? " child-selected" : ""}${isDirectDropTarget && !isPreview ? " bx-drop-target-active" : ""}${isPreview ? " preview" : ""}`}
+      style={nodeStyles}
+      draggable={!isPreview && !node.locked && parentNode?.props?.layout !== "freeform"}
+      onDragStart={!isPreview && !node.locked && parentNode?.props?.layout !== "freeform" ? (e) => {
+        if (e.target.isContentEditable) {
+          e.preventDefault();
+          return;
+        }
+        onStartNodeDrag(e, node);
+      } : undefined}
+      onDragEnd={!isPreview ? onDragEnd : undefined}
+      onDragOver={isContainer && !isPreview && !node.locked ? (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (dragTarget?.parentId !== node.id) {
+          setDragTarget({ parentId: node.id, index: children.length });
+        }
+      } : (!isContainer && !isPreview && !node.locked && node.parentId ? (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const parentSiblings = (nodes || []).filter(n => n.parentId === node.parentId).sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
+        const myIndex = parentSiblings.findIndex(n => n.id === node.id);
+        setDragTarget({ parentId: node.parentId, index: myIndex >= 0 ? myIndex + 1 : 0 });
+      } : undefined)}
+      onDrop={isContainer && !isPreview && !node.locked ? (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const dropIndex = dragTarget?.parentId === node.id ? dragTarget.index : children.length;
+        onDropItem(e, node.id, dropIndex);
+      } : (!isContainer && !isPreview && !node.locked && node.parentId ? (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const parentSiblings = (nodes || []).filter(n => n.parentId === node.parentId).sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
+        const myIndex = parentSiblings.findIndex(n => n.id === node.id);
+        onDropItem(e, node.parentId, myIndex >= 0 ? myIndex + 1 : 0);
+      } : undefined)}
+      onClick={(e) => {
+        if (isPreview) return;
+        e.stopPropagation();
+        if (e.shiftKey) {
+          setMultiSelected(prev => prev.includes(node.id) ? prev.filter(id => id !== node.id) : [...prev, node.id]);
+        } else {
+          setSelected(node.id);
+          setMultiSelected([]);
+        }
+      }}
+      onPointerDown={(e) => {
+        if (isPreview || node.locked) return;
+        if (e.target.isContentEditable) return;
+        if (parentNode?.props?.layout === "freeform") {
+          startDrag(e, node.id);
+        }
+      }}
+    >
+      {/* Selection Header Badge & Breadcrumbs */}
+      {isSel && !isPreview && !node.locked && (
+        <div className="bx-node-badge" onClick={e => e.stopPropagation()}>
+          {node.parentId && (
+            <button
+              type="button"
+              className="bx-node-parent-btn"
+              onClick={() => setSelected(node.parentId)}
+              title="Select parent container"
+            >
+              ⬆ {parentNode?.name || parentNode?.type || "Parent"}
+            </button>
+          )}
+          <span
+            className="bx-node-drag-handle"
+            draggable
+            onDragStart={(e) => onStartNodeDrag(e, node)}
+            onDragEnd={onDragEnd}
+            title="Drag to reorder or move into another container"
+          >
+            ⠿ {node.name || node.type}
+          </span>
+        </div>
+      )}
+
+      {/* Resize handles (in freeform mode) */}
+      {isSel && !isPreview && !node.locked && parentNode?.props?.layout === "freeform" && (
+        <>
+          {["nw","n","ne","e","se","s","sw","w"].map(dir => (
+            <div
+              key={dir}
+              className={`bx-handle bx-handle-${dir}`}
+              onPointerDown={e => { e.stopPropagation(); startDrag(e, node.id, `resize-${dir}`); }}
+            />
+          ))}
+        </>
+      )}
+
+      {/* Container rendering: recursive child nodes + drop zones */}
+      {isContainer ? (
+        <>
+          {children.length === 0 ? (
+            !isPreview && (
+              <div
+                className={`bx-empty-container${isDirectDropTarget && dragTarget?.index === 0 ? " drop-hover" : ""}`}
+                onDragOver={(e) => handleDragOver(e, 0)}
+                onDrop={(e) => handleDrop(e, 0)}
+              >
+                <span style={{ fontSize: 16 }}>{node.type === "section" ? "▬" : node.type === "columns" ? "⊟" : "▭"}</span>
+                <span>Empty {node.type} · Drop components here</span>
+              </div>
+            )
+          ) : (
+            children.map((child, idx) => (
+              <div key={child.id} style={{ display: "contents" }}>
+                {/* Insertion slot before child */}
+                {!isPreview && (
+                  <div
+                    style={{
+                      height: layout === "row" ? "100%" : 8,
+                      width: layout === "row" ? 8 : "100%",
+                      margin: layout === "row" ? "0 2px" : "2px 0",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                    onDragOver={(e) => handleDragOver(e, idx)}
+                    onDrop={(e) => handleDrop(e, idx)}
+                  >
+                    {isDirectDropTarget && dragTarget?.index === idx && (
+                      <div className={`bx-drop-indicator-line${layout === "row" ? " vertical" : ""}`} />
+                    )}
+                  </div>
+                )}
+
+                <CanvasNode
+                  node={child}
+                  nodes={nodes}
+                  selected={selected}
+                  setSelected={setSelected}
+                  multiSelected={multiSelected}
+                  setMultiSelected={setMultiSelected}
+                  updateNode={updateNode}
+                  startDrag={startDrag}
+                  isPreview={isPreview}
+                  previewDevice={previewDevice}
+                  dragTarget={dragTarget}
+                  setDragTarget={setDragTarget}
+                  onDropItem={onDropItem}
+                  onStartNodeDrag={onStartNodeDrag}
+                  onDragEnd={onDragEnd}
+                  draggingNodeId={draggingNodeId}
+                />
+
+                {/* Insertion slot after last child */}
+                {!isPreview && idx === children.length - 1 && (
+                  <div
+                    style={{
+                      height: layout === "row" ? "100%" : 8,
+                      width: layout === "row" ? 8 : "100%",
+                      margin: layout === "row" ? "0 2px" : "2px 0",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                    onDragOver={(e) => handleDragOver(e, idx + 1)}
+                    onDrop={(e) => handleDrop(e, idx + 1)}
+                  >
+                    {isDirectDropTarget && dragTarget?.index === idx + 1 && (
+                      <div className={`bx-drop-indicator-line${layout === "row" ? " vertical" : ""}`} />
+                    )}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </>
+      ) : (
+        renderNodeContent(node, updateNode, isPreview, nodes)
+      )}
     </div>
   );
 }
@@ -899,6 +2110,9 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
   const token = propToken || localStorage.getItem("token") || "";
 
   const handleBack = () => {
+    if (!projectId) {
+      try { localStorage.removeItem("buildx-draft-new"); } catch {}
+    }
     if (onBack) onBack();
     navigate("/dashboard");
   };
@@ -906,6 +2120,7 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
   const draftKey = projectId ? `buildx-draft-${projectId}` : "buildx-draft-new";
   const getSavedDraft = () => {
     try {
+      if (!projectId) return { projectId: null, updatedAt: 0, nodes: [] };
       const raw = localStorage.getItem(draftKey);
       if (!raw) return { projectId, updatedAt: 0, nodes: [] };
       const parsed = JSON.parse(raw);
@@ -919,8 +2134,8 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
     }
   };
 
-  const initialDraft = getSavedDraft();
-  const { state: nodes = [], push, undo, redo, canUndo, canRedo } = useHistory(initialDraft?.nodes || []);
+  const { state: nodes = [], push, undo, redo, reset, canUndo, canRedo } = useHistory([]);
+  const isInitializedRef = useRef(!projectId);
   const [selected, setSelected] = useState(null); // single id
   const [multiSelected, setMultiSelected] = useState([]); // array of ids
   const [guides, setGuides] = useState([]);
@@ -935,6 +2150,12 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [showGuides, setShowGuides] = useState(true);
   const [zoom, setZoom] = useState(1);
+  const [activeTool, setActiveTool] = useState("select"); // "select" | "hand"
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
+  const isPanningRef = useRef(false);
+  const panStartRef = useRef({ startX: 0, startY: 0, initialPanX: 0, initialPanY: 0 });
   const [isPreview, setIsPreview] = useState(false);
   const [previewDevice, setPreviewDevice] = useState("desktop");
   const [leftTab, setLeftTab] = useState("components"); // "components" | "layers"
@@ -947,7 +2168,7 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
   const [currentProjectId, setCurrentProjectId] = useState(projectId || null);
   const [dragOver, setDragOver] = useState(false);
   const [layerSearch, setLayerSearch] = useState("");
-  const [pages, setPages] = useState([]);
+  const [pages, setPages] = useState([{ id: "page-1", name: "Home", components: [] }]);
   const [currentPageId, setCurrentPageId] = useState("page-1");
 
   // ── Publish Modal & Deployment State ──
@@ -960,11 +2181,41 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
   const canvasRef = useRef(null);
   const wrapRef = useRef(null);
   const dragState = useRef(null);
+  const lastDropTimeRef = useRef(0);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
   };
+
+  const resetToCenter = useCallback(() => {
+    if (wrapRef.current) {
+      const wrapW = wrapRef.current.clientWidth;
+      if (wrapW > 0 && wrapW < 1240) {
+        const fitZoom = Math.max(0.4, Math.min(1, +((wrapW - 48) / 1200).toFixed(2)));
+        setZoom(fitZoom);
+      } else {
+        setZoom(1);
+      }
+    } else {
+      setZoom(1);
+    }
+    setPan({ x: 0, y: 0 });
+  }, []);
+
+  // Adapt initial zoom to viewport width if smaller than 1240px artboard width
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (wrapRef.current) {
+        const wrapW = wrapRef.current.clientWidth;
+        if (wrapW > 0 && wrapW < 1240) {
+          const fitZoom = Math.max(0.4, Math.min(1, +((wrapW - 48) / 1200).toFixed(2)));
+          setZoom(fitZoom);
+        }
+      }
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [projectId]);
 
   const selectedNode = (nodes || []).find(n => n.id === selected);
   const gridSnapStep = gridType === "columns"
@@ -974,11 +2225,11 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
       : Math.max(1, (800 - (gridMargin * 2) + ((gridRows - 1) * gridGap)) / Math.max(1, gridRows));
 
   useEffect(() => {
+    if (!isInitializedRef.current) return;
     try {
-      const draft = getSavedDraft();
-      if (nodes.length > 0) {
+      if (projectId && nodes.length > 0) {
         localStorage.setItem(draftKey, JSON.stringify({
-          projectId: projectId || draft.projectId || null,
+          projectId,
           updatedAt: Date.now(),
           nodes,
         }));
@@ -1001,9 +2252,26 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
     });
   }, [nodes, currentPageId]);
 
-  // ── Load existing project ──
+  // ── Load existing project or reset for new blank project ──
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId) {
+      setCurrentProjectId(null);
+      setProjectName("Untitled Project");
+      setPages([{ id: "page-1", name: "Home", components: [] }]);
+      setCurrentPageId("page-1");
+      setSelected(null);
+      setMultiSelected([]);
+      setPan({ x: 0, y: 0 });
+      setZoom(1);
+      setActiveTool("select");
+      reset([]);
+      try {
+        localStorage.removeItem("buildx-draft-new");
+      } catch {}
+      isInitializedRef.current = true;
+      setLoading(false);
+      return;
+    }
     const load = async () => {
       try {
         const res = await fetch(`${API}/projects/${projectId}`, {
@@ -1017,87 +2285,191 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
           const mapped = (p.components || []).map((c, i) => restoreNodeFromProject(c, i));
 
           const projectPages = Array.isArray(p.settings?.pages) && p.settings.pages.length
-            ? p.settings.pages.map((page, index) => ({
-                id: page.id || `page-${index + 1}`,
-                name: page.name || `Page ${index + 1}`,
-                components: Array.isArray(page.components) ? page.components.map((c, j) => restoreNodeFromProject(c, j)) : [],
-              }))
+            ? p.settings.pages.map((page, index) => {
+                const pageComps = Array.isArray(page.components) ? page.components.map((c, j) => restoreNodeFromProject(c, j)) : [];
+                return {
+                  id: page.id || `page-${index + 1}`,
+                  name: page.name || `Page ${index + 1}`,
+                  components: (index === 0 && mapped.length > 0) ? mapped : pageComps,
+                };
+              })
             : [{ id: "page-1", name: "Home", components: mapped }];
 
-          const savedDraft = getSavedDraft();
-          const draftNodes = Array.isArray(savedDraft.nodes) ? savedDraft.nodes : [];
-          const lastSavedAt = Number(p.updatedAt ? new Date(p.updatedAt).getTime() : 0);
-          const shouldUseDraft = draftNodes.length > 0 && savedDraft.projectId === projectId && Number(savedDraft.updatedAt || 0) > lastSavedAt;
-          const initialNodes = shouldUseDraft ? draftNodes : projectPages[0].components;
-          const initialPageId = projectPages[0].id;
+          const serverNodes = mapped.length > 0 ? mapped : (projectPages[0]?.components || []);
+          // Server components take full precedence for existing projects to prevent stale draft overrides
+          const initialNodes = serverNodes;
+          const initialPageId = projectPages[0]?.id || "page-1";
+          const lastSavedAt = Number(p.updatedAt ? new Date(p.updatedAt).getTime() : Date.now());
 
           setPages(projectPages);
           setCurrentPageId(initialPageId);
           push(initialNodes);
 
-          if (shouldUseDraft) {
-            localStorage.setItem(draftKey, JSON.stringify({
-              projectId,
-              updatedAt: savedDraft.updatedAt,
-              nodes: draftNodes,
-            }));
-          } else {
-            localStorage.setItem(draftKey, JSON.stringify({
-              projectId,
-              updatedAt: lastSavedAt || Date.now(),
-              nodes: initialNodes,
-            }));
-          }
+          localStorage.setItem(draftKey, JSON.stringify({
+            projectId,
+            updatedAt: lastSavedAt,
+            nodes: initialNodes,
+          }));
         }
       } catch {}
-      finally { setLoading(false); }
+      finally {
+        isInitializedRef.current = true;
+        setLoading(false);
+      }
     };
     load();
   }, [projectId]);
 
-  const deleteSelected = useCallback(() => {
-    if (!selected) return;
-    push(prev => prev.filter(n => n.id !== selected));
-    setSelected(null);
-  }, [selected, push]);
+  const [dragTarget, setDragTarget] = useState(null); // { parentId: string | null, index: number }
+  const [draggingNodeId, setDraggingNodeId] = useState(null);
+  const [collapsedIds, setCollapsedIds] = useState(() => new Set());
+  const isPanMode = !isPreview && (activeTool === "hand" || isSpacePressed);
 
-  const duplicateSelected = useCallback(() => {
-    if (!selected) return;
-    const orig = (nodes || []).find(n => n.id === selected);
-    if (!orig) return;
-    const copy = { ...orig, id: `${orig.type}-${Date.now()}`, x: orig.x + 24, y: orig.y + 24, props: { ...orig.props } };
-    push(prev => [...prev, copy]);
-    setSelected(copy.id);
-  }, [selected, nodes, push]);
+  const handleCanvasPointerDown = useCallback((e) => {
+    if (isPreview) return;
+    if (e.target.closest?.(".bx-canvas-pan-indicator") || e.target.closest?.(".bx-align-bar")) {
+      return;
+    }
+    const isMiddleClick = e.button === 1;
+    const isHandActive = activeTool === "hand" || isSpacePressed;
 
-  // ── Keyboard shortcuts ──
+    if (isHandActive || isMiddleClick) {
+      e.preventDefault();
+      e.stopPropagation();
+      isPanningRef.current = true;
+      setIsPanning(true);
+      panStartRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        initialPanX: pan.x,
+        initialPanY: pan.y,
+      };
+
+      const handlePointerMove = (ev) => {
+        if (!isPanningRef.current) return;
+        ev.preventDefault();
+        const dx = ev.clientX - panStartRef.current.startX;
+        const dy = ev.clientY - panStartRef.current.startY;
+        setPan({
+          x: Math.round(panStartRef.current.initialPanX + dx),
+          y: Math.round(panStartRef.current.initialPanY + dy),
+        });
+      };
+
+      const handlePointerUp = () => {
+        isPanningRef.current = false;
+        setIsPanning(false);
+        document.removeEventListener("pointermove", handlePointerMove);
+        document.removeEventListener("pointerup", handlePointerUp);
+        document.removeEventListener("pointercancel", handlePointerUp);
+      };
+
+      document.addEventListener("pointermove", handlePointerMove, { passive: false });
+      document.addEventListener("pointerup", handlePointerUp);
+      document.addEventListener("pointercancel", handlePointerUp);
+      return;
+    }
+
+    if (e.target === canvasRef.current || e.target === wrapRef.current) {
+      setSelected(null);
+      setMultiSelected([]);
+    }
+  }, [isPreview, activeTool, isSpacePressed, pan]);
+
+  // Non-passive wheel listener on wrapRef to smoothly pan or zoom
   useEffect(() => {
-    const onKey = (e) => {
-      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable) return;
-      if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
-      if ((e.metaKey || e.ctrlKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) { e.preventDefault(); redo(); }
-      if ((e.metaKey || e.ctrlKey) && e.key === "d") { e.preventDefault(); duplicateSelected(); }
-      if (e.key === "Delete" || e.key === "Backspace") { if (selected) { e.preventDefault(); deleteSelected(); } }
-      if (e.key === "Escape") { setSelected(null); setMultiSelected([]); }
-      if ((e.metaKey || e.ctrlKey) && e.key === "a") { e.preventDefault(); setMultiSelected(nodes.map(n => n.id)); }
-      // Arrow nudge
-      if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key) && selected) {
-        e.preventDefault();
-        const delta = e.shiftKey ? 10 : 1;
-        push(prev => prev.map(n => n.id !== selected ? n : {
-          ...n,
-          x: n.x + (e.key === "ArrowRight" ? delta : e.key === "ArrowLeft" ? -delta : 0),
-          y: n.y + (e.key === "ArrowDown" ? delta : e.key === "ArrowUp" ? -delta : 0),
+    const wrapEl = wrapRef.current;
+    if (!wrapEl) return;
+
+    const onWheel = (e) => {
+      if (isPreview) return;
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        const zoomStep = e.deltaY < 0 ? 0.05 : -0.05;
+        setZoom(z => Math.min(3, Math.max(0.25, +(z + zoomStep).toFixed(2))));
+      } else {
+        setPan(prev => ({
+          x: Math.round(prev.x - e.deltaX),
+          y: Math.round(prev.y - e.deltaY),
         }));
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [selected, nodes, undo, redo, deleteSelected, duplicateSelected, push]);
 
-  // ── Drag to move/resize ──
+    wrapEl.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      wrapEl.removeEventListener("wheel", onWheel);
+    };
+  }, [isPreview]);
+
+  // Keyboard shortcuts: Space (temporary Hand pan), H (Hand Tool), V / Esc (Select Tool)
+  useEffect(() => {
+    const isTextInput = (target) => {
+      if (!target) return false;
+      const tag = target.tagName?.toLowerCase();
+      return (
+        tag === "input" ||
+        tag === "textarea" ||
+        tag === "select" ||
+        target.isContentEditable ||
+        Boolean(target.closest?.('[contenteditable="true"]'))
+      );
+    };
+
+    const handleKeyDown = (e) => {
+      if (isTextInput(e.target)) return;
+
+      if (e.code === "Space" && !e.repeat) {
+        e.preventDefault();
+        setIsSpacePressed(true);
+      } else if ((e.key === "h" || e.key === "H") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setActiveTool("hand");
+      } else if ((e.key === "v" || e.key === "V" || e.key === "Escape") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        setActiveTool("select");
+      }
+    };
+
+    const handleKeyUp = (e) => {
+      if (e.code === "Space") {
+        setIsSpacePressed(false);
+      }
+    };
+
+    const handleBlur = () => {
+      setIsSpacePressed(false);
+      isPanningRef.current = false;
+      setIsPanning(false);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleBlur);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, []);
+
+  // Global cursor feedback while dragging/panning
+  useEffect(() => {
+    if (isPanning) {
+      document.body.style.cursor = "grabbing";
+      document.body.style.userSelect = "none";
+    } else {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    }
+    return () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isPanning]);
+
+  // ── Drag to move/resize (Freeform layout) ──
   const startDrag = useCallback((e, id, mode = "move") => {
-    if (isPreview) return;
+    if (isPreview || isPanMode) return;
     e.preventDefault();
     e.stopPropagation();
     const node = (nodes || []).find(n => n.id === id);
@@ -1111,25 +2483,25 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
     };
     const onMove = (ev) => {
       if (!dragState.current) return;
-      const { id, mode, startX, startY, origX, origY, origW, origH } = dragState.current;
+      const { id: dragId, mode: dragMode, startX, startY, origX, origY, origW, origH } = dragState.current;
       const dx = (ev.clientX - startX) / zoom;
       const dy = (ev.clientY - startY) / zoom;
       push(prev => prev.map(n => {
-        if (n.id !== id) return n;
-        if (mode === "move") {
+        if (n.id !== dragId) return n;
+        if (dragMode === "move") {
           const rawX = Math.max(0, origX + dx);
           const rawY = Math.max(0, origY + dy);
-          const others = prev.filter(o => o.id !== id);
+          const others = prev.filter(o => o.id !== dragId);
           const { sx, sy, guides: g } = getSnapGuides(rawX, rawY, n.w, n.h, others, gridSnapStep);
           setGuides(g);
           return { ...n, x: snapToGrid ? sx : rawX, y: snapToGrid ? sy : rawY };
         }
         let { x, y, w, h } = { x: origX, y: origY, w: origW, h: origH };
         const resizeSnap = value => snapToGrid ? snap(value, gridSnapStep) : value;
-        if (mode.includes("e"))  w = resizeSnap(Math.max(20, origW + dx));
-        if (mode.includes("s"))  h = resizeSnap(Math.max(8,  origH + dy));
-        if (mode.includes("w")) { w = resizeSnap(Math.max(20, origW - dx)); x = resizeSnap(origX + origW - w); }
-        if (mode.includes("n")) { h = resizeSnap(Math.max(8, origH - dy)); y = resizeSnap(origY + origH - h); }
+        if (dragMode.includes("e"))  w = resizeSnap(Math.max(20, origW + dx));
+        if (dragMode.includes("s"))  h = resizeSnap(Math.max(8,  origH + dy));
+        if (dragMode.includes("w")) { w = resizeSnap(Math.max(20, origW - dx)); x = resizeSnap(origX + origW - w); }
+        if (dragMode.includes("n")) { h = resizeSnap(Math.max(8, origH - dy)); y = resizeSnap(origY + origH - h); }
         return { ...n, x, y, w, h };
       }));
     };
@@ -1141,43 +2513,263 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
-  }, [nodes, zoom, isPreview, push, snapToGrid, gridSnapStep]);
+  }, [nodes, zoom, isPreview, push, snapToGrid, gridSnapStep, isPanMode]);
 
-  // ── Drop from sidebar ──
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setDragOver(false);
-    const raw = e.dataTransfer.getData("compDef");
-    if (!raw) return;
-    const def = JSON.parse(raw);
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = snap(Math.max(0, (e.clientX - rect.left) / zoom - def.defaultW / 2), snapToGrid ? gridSnapStep : 1);
-    const y = snap(Math.max(0, (e.clientY - rect.top) / zoom - def.defaultH / 2), snapToGrid ? gridSnapStep : 1);
-    let parentId = null;
-    const parentNode = (nodes || []).find((node) => {
-      if (node.type !== "section" && node.type !== "container" && node.type !== "columns") return false;
-      return x >= node.x && y >= node.y && x + def.defaultW <= node.x + node.w && y + def.defaultH <= node.y + node.h;
+  const deleteSelected = useCallback(() => {
+    if (!selected) return;
+    const toDelete = (nodes || []).find(n => n.id === selected);
+    const parentId = toDelete?.parentId ?? null;
+    const descendantIds = getAllDescendantIds(nodes, selected);
+    descendantIds.add(selected);
+
+    push(prev => {
+      const remaining = prev.filter(n => !descendantIds.has(n.id));
+      const siblings = remaining
+        .filter(n => (n.parentId ?? null) === parentId)
+        .sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
+      const orderMap = new Map();
+      siblings.forEach((s, idx) => orderMap.set(s.id, idx));
+
+      return remaining.map(n => orderMap.has(n.id) ? { ...n, order: orderMap.get(n.id) } : n);
     });
-    if (parentNode) {
-      parentId = parentNode.id;
-    }
 
+    setSelected(null);
+    setMultiSelected([]);
+    showToast("Deleted element and contents");
+  }, [selected, nodes, push]);
+
+  const duplicateSelected = useCallback(() => {
+    if (!selected) return;
+    const { updatedNodes, newRootId } = duplicateNodeRecursive(nodes, selected);
+    push(updatedNodes);
+    if (newRootId) setSelected(newRootId);
+    showToast("Duplicated element and contents");
+  }, [selected, nodes, push]);
+
+  const handleDragEnd = useCallback(() => {
+    setDragOver(false);
+    setDragTarget(null);
+    setDraggingNodeId(null);
+  }, []);
+
+  const handleNodeDragStart = useCallback((e, node) => {
+    e.stopPropagation();
+    e.dataTransfer.setData("application/json", JSON.stringify({ source: "canvas", id: node.id }));
+    e.dataTransfer.setData("nodeId", node.id);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggingNodeId(node.id);
+  }, []);
+
+  const insertSidebarComponent = useCallback((def, targetParentId, insertIndex = null) => {
+    const newNodeId = `${def.type}-${Date.now()}`;
     const newNode = {
-      id: `${def.type}-${Date.now()}`,
+      id: newNodeId,
       type: def.type,
-      x: parentNode ? 12 : x,
-      y: parentNode ? 12 : y,
-      w: def.defaultW,
-      h: def.defaultH,
-      props: sanitizeComponentProps(def.type, def.props),
-      parentId,
+      name: def.label || def.type,
+      parentId: targetParentId,
+      order: insertIndex ?? 0,
+      x: 0,
+      y: 0,
+      w: def.defaultW || (def.type === "section" ? 1200 : 280),
+      h: def.defaultH || (def.type === "section" ? 180 : 60),
+      props: sanitizeComponentProps(def.type, def.props || (def.type === "section" ? { bg: "#f8fafc", layout: "stack" } : {})),
       locked: false,
       hidden: false,
-      name: def.label,
     };
-    push(prev => [...prev, newNode]);
-    setSelected(newNode.id);
-  };
+
+    push(prev => {
+      const siblings = prev
+        .filter(n => n.parentId === targetParentId)
+        .sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
+      const idx = insertIndex !== null && insertIndex !== undefined
+        ? Math.min(insertIndex, siblings.length)
+        : siblings.length;
+      const newSiblings = [...siblings];
+      newSiblings.splice(idx, 0, newNode);
+      const orderMap = new Map();
+      newSiblings.forEach((s, i) => orderMap.set(s.id, i));
+
+      const updated = prev.map(n => orderMap.has(n.id) ? { ...n, order: orderMap.get(n.id) } : n);
+      return [...updated, { ...newNode, order: idx }];
+    });
+
+    setSelected(newNodeId);
+    showToast(`Added ${def.label || def.type}`);
+  }, [push]);
+
+  const handleDropItem = useCallback((e, targetParentId, insertIndex = null) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (Date.now() - lastDropTimeRef.current < 250) return;
+    lastDropTimeRef.current = Date.now();
+    setDragTarget(null);
+    setDraggingNodeId(null);
+
+    try {
+      const rawJson = e.dataTransfer.getData("application/json");
+      const rawComp = e.dataTransfer.getData("compDef");
+      const nodeId = e.dataTransfer.getData("nodeId");
+
+      let payload = null;
+      if (rawJson) {
+        try { payload = JSON.parse(rawJson); } catch {}
+      }
+      if (!payload && rawComp) {
+        try { payload = { source: "sidebar", def: JSON.parse(rawComp) }; } catch {}
+      }
+      if (!payload && nodeId) {
+        payload = { source: "canvas", id: nodeId };
+      }
+      if (!payload) return;
+
+      if (payload.source === "sidebar" || payload.def) {
+        insertSidebarComponent(payload.def || payload, targetParentId, insertIndex);
+      } else if (payload.source === "canvas" && payload.id) {
+        const movedId = payload.id;
+        if (targetParentId && (movedId === targetParentId || isDescendant(nodes, movedId, targetParentId))) {
+          showToast("Cannot place a container inside its own descendant", "error");
+          return;
+        }
+
+        push(prev => reorderNodes(prev, movedId, targetParentId, insertIndex));
+        setSelected(movedId);
+      }
+    } catch (err) {
+      console.error("Drop error:", err);
+    }
+  }, [nodes, push, insertSidebarComponent]);
+
+  const handleRootDrop = useCallback((e, insertIndex = null) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (Date.now() - lastDropTimeRef.current < 250) return;
+    lastDropTimeRef.current = Date.now();
+    setDragOver(false);
+    setDragTarget(null);
+    setDraggingNodeId(null);
+
+    try {
+      const rawJson = e.dataTransfer.getData("application/json");
+      const rawComp = e.dataTransfer.getData("compDef");
+      const nodeId = e.dataTransfer.getData("nodeId");
+
+      let payload = null;
+      if (rawJson) {
+        try { payload = JSON.parse(rawJson); } catch {}
+      }
+      if (!payload && rawComp) {
+        try { payload = { source: "sidebar", def: JSON.parse(rawComp) }; } catch {}
+      }
+      if (!payload && nodeId) {
+        payload = { source: "canvas", id: nodeId };
+      }
+      if (!payload) return;
+
+      if (payload.source === "sidebar" || payload.def) {
+        const def = payload.def || payload;
+        if (def.type === "section") {
+          insertSidebarComponent(def, null, insertIndex);
+        } else {
+          const rootSections = (nodes || [])
+            .filter(n => n.type === "section" && !n.parentId)
+            .sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
+
+          const sectionIdx = insertIndex !== null && insertIndex !== undefined
+            ? Math.min(insertIndex, rootSections.length)
+            : rootSections.length;
+
+          const sectionId = `section-${Date.now()}`;
+          const newSection = {
+            id: sectionId,
+            type: "section",
+            name: "Section",
+            parentId: null,
+            order: sectionIdx,
+            x: 0,
+            y: 0,
+            w: 1200,
+            h: 200,
+            props: sanitizeComponentProps("section", { bg: "#f8fafc", layout: "stack" }),
+            locked: false,
+            hidden: false,
+          };
+          const childId = `${def.type}-${Date.now() + 1}`;
+          const newChild = {
+            id: childId,
+            type: def.type,
+            name: def.label || def.type,
+            parentId: sectionId,
+            order: 0,
+            x: 0,
+            y: 0,
+            w: def.defaultW || 280,
+            h: def.defaultH || 60,
+            props: sanitizeComponentProps(def.type, def.props || {}),
+            locked: false,
+            hidden: false,
+          };
+
+          push(prev => {
+            const currentRootSections = prev
+              .filter(n => n.type === "section" && !n.parentId)
+              .sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
+            const newRootSections = [...currentRootSections];
+            newRootSections.splice(sectionIdx, 0, newSection);
+            const orderMap = new Map();
+            newRootSections.forEach((s, i) => orderMap.set(s.id, i));
+
+            const updated = prev.map(n => orderMap.has(n.id) ? { ...n, order: orderMap.get(n.id) } : n);
+            return [...updated, { ...newSection, order: sectionIdx }, newChild];
+          });
+          setSelected(childId);
+          showToast(`Added ${def.label || def.type} in new Section`);
+        }
+      } else if (payload.source === "canvas" && payload.id) {
+        const movedNode = (nodes || []).find(n => n.id === payload.id);
+        if (movedNode?.type === "section") {
+          push(prev => reorderNodes(prev, payload.id, null, insertIndex));
+        } else {
+          const sectionId = `section-${Date.now()}`;
+          const rootSecs = (nodes || []).filter(n => n.type === "section" && !n.parentId);
+          const sectionIdx = insertIndex !== null && insertIndex !== undefined
+            ? Math.min(insertIndex, rootSecs.length)
+            : rootSecs.length;
+
+          const newSection = {
+            id: sectionId,
+            type: "section",
+            name: "Section",
+            parentId: null,
+            order: sectionIdx,
+            x: 0,
+            y: 0,
+            w: 1200,
+            h: 200,
+            props: sanitizeComponentProps("section", { bg: "#f8fafc", layout: "stack" }),
+            locked: false,
+            hidden: false,
+          };
+
+          push(prev => {
+            const currentRootSections = prev
+              .filter(n => n.type === "section" && !n.parentId)
+              .sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
+            const newRootSections = [...currentRootSections];
+            newRootSections.splice(sectionIdx, 0, newSection);
+            const orderMap = new Map();
+            newRootSections.forEach((s, i) => orderMap.set(s.id, i));
+
+            const reparented = reorderNodes(prev, payload.id, sectionId, 0);
+            const updated = reparented.map(n => orderMap.has(n.id) ? { ...n, order: orderMap.get(n.id) } : n);
+            return [...updated, { ...newSection, order: sectionIdx }];
+          });
+        }
+        setSelected(payload.id);
+      }
+    } catch (err) {
+      console.error("Root drop error:", err);
+    }
+  }, [nodes, push, insertSidebarComponent]);
 
   const updateNode = (updated) => {
     push(prev => prev.map(n => n.id === updated.id ? updated : n));
@@ -1297,7 +2889,7 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
     if (!token) { showToast("Not logged in", "error"); return; }
     setSaving(true);
     try {
-      const ALLOWED = ["button","input","textarea","text","heading","image","imagegrid","video","container","section","columns","formblock","navbar","footer","hero","card","badge","alert","tabs","productcard","pricingcard","testimonial","blogcard","statcard","divider","spacer","select","checkbox"];
+      const ALLOWED = SUPPORTED_COMPONENT_TYPES;
       const comps = nodes.map((n) => serializeNodeForStorage(n));
       const serializedPages = pages.length
         ? pages.map((page) => ({
@@ -1339,7 +2931,6 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
           localStorage.removeItem("buildx-draft-new");
         }
         showToast(isUpdate ? "Project saved!" : "Project created!");
-        setTimeout(() => handleBack(), 1200);
       } else {
         showToast(data.message || "Save failed", "error");
       }
@@ -1355,7 +2946,7 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
     setPublishError("");
 
     try {
-      const ALLOWED = ["button","input","textarea","text","heading","image","imagegrid","video","container","section","columns","formblock","navbar","footer","hero","card","badge","alert","tabs","productcard","pricingcard","testimonial","blogcard","statcard","divider","spacer","select","checkbox"];
+      const ALLOWED = SUPPORTED_COMPONENT_TYPES;
       const comps = nodes.map((n) => serializeNodeForStorage(n));
 
       let projId = currentProjectId;
@@ -1384,7 +2975,7 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
         ? pages.map((page) => ({
             id: page.id,
             name: page.name || "Page",
-            components: page.components || [],
+            components: (page.components || []).map((component) => serializeNodeForStorage(component)),
           }))
         : [{ id: currentPageId || "page-1", name: "Home", components: comps }];
 
@@ -1428,7 +3019,7 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
     );
   }
 
-  const visibleNodes = nodes.filter(n => !n.hidden && !n.parentId);
+  const rootNodes = (nodes || []).filter(n => !n.hidden && !n.parentId).sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
   const activeIds = multiSelected.length > 1 ? multiSelected : (selected ? [selected] : []);
 
   return (
@@ -1467,11 +3058,36 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
             </button>
           </div>
 
+          <div className="bx-tool-selector" role="group" aria-label="Editor Tools">
+            <button
+              type="button"
+              className={`bx-tool-btn${activeTool === "select" && !isSpacePressed ? " active" : ""}`}
+              onClick={() => setActiveTool("select")}
+              title="Select tool (V)"
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13">
+                <path d="M6.672 1.512a1 1 0 00-1.638.749v14.478a1 1 0 001.697.728l3.96-3.805 2.502 5.004a1 1 0 001.789-.894l-2.483-4.966 5.17-.414a1 1 0 00.672-1.675L6.672 1.512z" />
+              </svg>
+              <span>Select</span>
+            </button>
+            <button
+              type="button"
+              className={`bx-tool-btn${activeTool === "hand" || isSpacePressed ? " active" : ""}`}
+              onClick={() => setActiveTool("hand")}
+              title="Hand tool (H) — Drag to pan canvas (or hold Space)"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+                <path d="M13.5 1.5a1.5 1.5 0 00-3 0v8.25H9.25V4a1.5 1.5 0 00-3 0v7.25H5A1.5 1.5 0 003.5 12v3.75a8.25 8.25 0 008.25 8.25h.5a8.25 8.25 0 008.25-8.25V7a1.5 1.5 0 00-3 0v4.25h-1.25V2.5a1.5 1.5 0 00-3 0v8.75h-1.25V1.5z" />
+              </svg>
+              <span>Hand</span>
+            </button>
+          </div>
+
           <div className="bx-zoom-ctrl">
             <button onClick={() => setZoom(z => Math.max(0.25, +(z - 0.1).toFixed(2)))}>−</button>
             <span>{Math.round(zoom * 100)}%</span>
             <button onClick={() => setZoom(z => Math.min(3, +(z + 0.1).toFixed(2)))}>+</button>
-            <button onClick={() => setZoom(1)} title="Reset zoom">⊙</button>
+            <button onClick={resetToCenter} title="Reset view to center (⊙)">⊙</button>
           </div>
 
           {!isPreview && (
@@ -1604,7 +3220,12 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
                       <div key={item.type} className="bx-comp-item"
                         data-imagegrid={item.type === "imagegrid" ? "true" : undefined}
                         draggable
-                        onDragStart={e => { e.dataTransfer.setData("compDef", JSON.stringify(item)); e.dataTransfer.effectAllowed = "copy"; }}>
+                        onDragStart={e => {
+                          e.dataTransfer.setData("application/json", JSON.stringify({ source: "sidebar", def: item }));
+                          e.dataTransfer.setData("compDef", JSON.stringify(item));
+                          e.dataTransfer.effectAllowed = "copy";
+                        }}
+                        onDragEnd={handleDragEnd}>
                         <span className="bx-comp-icon">{item.icon}</span>
                         <span className="bx-comp-label">{item.label}</span>
                       </div>
@@ -1618,24 +3239,43 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
               <div className="bx-layers-panel">
                 <input className="bx-layer-search" placeholder="Search layers…" value={layerSearch} onChange={e => setLayerSearch(e.target.value)} />
                 <div className="bx-layers-list">
-                  {[...nodes].reverse()
-                    .filter(n => !layerSearch || n.name?.toLowerCase().includes(layerSearch.toLowerCase()) || n.type.includes(layerSearch.toLowerCase()))
-                    .map(n => (
-                      <div key={n.id}
-                        className={`bx-layer-item${selected === n.id ? " active" : ""}${n.locked ? " locked" : ""}${n.hidden ? " hidden" : ""}`}
-                        onClick={() => setSelected(n.id)}>
-                        <span className="bx-layer-type-dot" style={{ background: n.locked ? "#f59e0b" : n.hidden ? "#475569" : "#6366f1" }} />
-                        <span className="bx-layer-name">{n.name || n.type}</span>
-                        <div className="bx-layer-actions">
-                          <button onClick={e => { e.stopPropagation(); toggleHide(n.id); }} title={n.hidden ? "Show" : "Hide"}>
-                            {n.hidden ? "○" : "●"}
-                          </button>
-                          <button onClick={e => { e.stopPropagation(); toggleLock(n.id); }} title={n.locked ? "Unlock" : "Lock"}>
-                            {n.locked ? "🔒" : "🔓"}
-                          </button>
+                  {layerSearch ? (
+                    nodes
+                      .filter(n => n.name?.toLowerCase().includes(layerSearch.toLowerCase()) || n.type.includes(layerSearch.toLowerCase()))
+                      .map(n => (
+                        <div key={n.id}
+                          className={`bx-layer-item${selected === n.id ? " active" : ""}${n.locked ? " locked" : ""}${n.hidden ? " hidden" : ""}`}
+                          onClick={() => setSelected(n.id)}>
+                          <span className="bx-layer-type-dot" style={{ background: n.locked ? "#f59e0b" : n.hidden ? "#475569" : "#6366f1" }} />
+                          <span className="bx-layer-name">{n.name || n.type}</span>
+                          <div className="bx-layer-actions">
+                            <button onClick={e => { e.stopPropagation(); toggleHide(n.id); }} title={n.hidden ? "Show" : "Hide"}>
+                              {n.hidden ? "○" : "●"}
+                            </button>
+                            <button onClick={e => { e.stopPropagation(); toggleLock(n.id); }} title={n.locked ? "Unlock" : "Lock"}>
+                              {n.locked ? "🔒" : "🔓"}
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                  ) : (
+                    <div className="bx-tree-view">
+                      {rootNodes.map(n => (
+                        <TreeItem
+                          key={n.id}
+                          node={n}
+                          nodes={nodes}
+                          depth={0}
+                          selected={selected}
+                          setSelected={setSelected}
+                          toggleHide={toggleHide}
+                          toggleLock={toggleLock}
+                          collapsedIds={collapsedIds}
+                          setCollapsedIds={setCollapsedIds}
+                        />
+                      ))}
+                    </div>
+                  )}
                   {nodes.length === 0 && <div className="bx-layers-empty">No elements yet</div>}
                 </div>
               </div>
@@ -1644,9 +3284,13 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
         )}
 
         {/* ── Canvas ── */}
-        <div className="bx-canvas-wrap" ref={wrapRef}>
+        <div
+          className={`bx-canvas-wrap${isPanMode ? " is-hand-mode" : ""}${isPanning ? " is-panning" : ""}`}
+          ref={wrapRef}
+          onPointerDown={handleCanvasPointerDown}
+        >
           {/* Alignment toolbar */}
-          {!isPreview && activeIds.length > 0 && (
+          {!isPreview && activeIds.length > 0 && !isPanMode && (
             <div className="bx-align-bar">
               {[
                 { t: "left",      label: "⇤" , title: "Align left" },
@@ -1668,11 +3312,18 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
           <div
             className={`bx-canvas${dragOver ? " drag-over" : ""}${isPreview ? ` bx-preview-${previewDevice}` : ""}`}
             ref={canvasRef}
-            style={!isPreview ? { transform: `scale(${zoom})`, transformOrigin: "top left" } : {}}
-            onDrop={!isPreview ? handleDrop : undefined}
-            onDragOver={!isPreview ? e => { e.preventDefault(); setDragOver(true); } : undefined}
-            onDragLeave={!isPreview ? () => setDragOver(false) : undefined}
-            onPointerDown={!isPreview ? e => { if (e.target === canvasRef.current) { setSelected(null); setMultiSelected([]); } } : undefined}
+            style={!isPreview ? {
+              width: 1200,
+              minWidth: 1200,
+              maxWidth: 1200,
+              minHeight: "100%",
+              flexShrink: 0,
+              transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+              transformOrigin: "top center",
+            } : {}}
+            onDrop={!isPreview && !isPanMode ? (e) => { e.preventDefault(); e.stopPropagation(); handleRootDrop(e, rootNodes.length); } : undefined}
+            onDragOver={!isPreview && !isPanMode ? e => { e.preventDefault(); setDragOver(true); } : undefined}
+            onDragLeave={!isPreview && !isPanMode ? (e) => { if (!e.currentTarget.contains(e.relatedTarget)) { setDragOver(false); setDragTarget(null); } } : undefined}
           >
             {/* Editor-only layout grid. It is never part of a saved node or preview. */}
             {!isPreview && showGrid && (
@@ -1689,7 +3340,7 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
                     ? "linear-gradient(to right, rgba(99,102,241,.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(99,102,241,.12) 1px, transparent 1px)"
                     : gridType === "columns"
                       ? `repeating-linear-gradient(to right, transparent 0, transparent calc((100% - ${(gridColumns - 1) * gridGap}px) / ${gridColumns} - 1px), rgba(99,102,241,.18) calc((100% - ${(gridColumns - 1) * gridGap}px) / ${gridColumns} - 1px), rgba(99,102,241,.18) calc((100% - ${(gridColumns - 1) * gridGap}px) / ${gridColumns}), transparent calc((100% - ${(gridColumns - 1) * gridGap}px) / ${gridColumns} + ${gridGap}px))`
-                      : `repeating-linear-gradient(to bottom, transparent 0, transparent calc((100% - ${(gridRows - 1) * gridGap}px) / ${gridRows} - 1px), rgba(99,102,241,.16) calc((100% - ${(gridRows - 1) * gridGap}px) / ${gridRows} - 1px), rgba(99,102,241,.16) calc((100% - ${(gridRows - 1) * gridGap}px) / ${gridRows}), transparent calc((100% - ${(gridRows - 1) * gridGap}px) / ${gridRows} + ${gridGap}px))`,
+                      : `repeating-linear-gradient(to bottom, transparent 0, transparent calc((100% - ${(gridRows - 1) * gridGap}px) / ${gridRows} - 1px), rgba(99,102,241,.16) calc((100% - ${(gridRows - 1) * gridGap}px) / ${gridRows} - 1px), rgba(99,102,241,.16) calc((100% - ${(gridRows - 1) * gridGap}px) / ${gridRows}), transparent calc((100% - ${(gridRows - 1) * gridGap}px) / ${gridRows} + ${gridGap}px))`
                 }}
               />
             )}
@@ -1701,55 +3352,92 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
                 : <div key={i} className="bx-guide-h" style={{ top: g.pos }} />
             )}
 
-            {/* Empty state */}
-            {nodes.length === 0 && !isPreview && (
-              <div className="bx-canvas-empty">
-                <svg viewBox="0 0 48 48" fill="none" width="48" height="48"><rect x="4" y="4" width="40" height="40" rx="8" stroke="#2a2a3e" strokeWidth="2"/><path d="M16 24h16M24 16v16" stroke="#6366f1" strokeWidth="2" strokeLinecap="round"/></svg>
-                <p>Drag components from the left panel</p>
-                <span>or describe what to build in the AI bar above</span>
-              </div>
-            )}
-
-            {/* Nodes */}
-            {visibleNodes.map(node => {
-              const isSel = selected === node.id || multiSelected.includes(node.id);
-              return (
+            <div className={`bx-canvas-flow${nodes.length === 0 ? " is-empty" : ""}`}>
+              {/* Empty state */}
+              {nodes.length === 0 && !isPreview && (
                 <div
-                  key={node.id}
-                  className={`bx-node bx-node-${node.type}${isSel && !isPreview ? " selected" : ""}${node.locked ? " locked" : ""}${isPreview ? " preview" : ""}`}
-                  style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
-                  onPointerDown={!isPreview && !node.locked ? e => {
-                    // If the user clicked inside a contentEditable element (text/heading/button),
-                    // do NOT start a drag — let the browser place the text cursor.
-                    if (e.target.isContentEditable) return;
-                    startDrag(e, node.id);
-                  } : undefined}
-                  onClick={isPreview ? undefined : e => {
-                    if (e.shiftKey) {
-                      setMultiSelected(prev => prev.includes(node.id) ? prev.filter(id => id !== node.id) : [...prev, node.id]);
-                    } else {
-                      setSelected(node.id);
-                      setMultiSelected([]);
-                    }
+                  className="bx-empty-container"
+                  style={{
+                    margin: "auto",
+                    maxWidth: 640,
+                    width: "100%",
+                    minHeight: 220,
                   }}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragTarget({ parentId: null, index: 0 }); }}
+                  onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleRootDrop(e, 0); }}
                 >
-                  {renderNodeContent(node, updateNode, false, nodes)}
-
-                  {/* Selection handles */}
-                  {isSel && !isPreview && !node.locked && (
-                    <>
-                      {["nw","n","ne","e","se","s","sw","w"].map(dir => (
-                        <div key={dir} className={`bx-handle bx-handle-${dir}`}
-                          onPointerDown={e => { e.stopPropagation(); startDrag(e, node.id, `resize-${dir}`); }} />
-                      ))}
-                      <div className="bx-node-label">{node.name || node.type}</div>
-                    </>
-                  )}
-                  {node.locked && !isPreview && <div className="bx-lock-badge">🔒</div>}
+                  <svg viewBox="0 0 48 48" fill="none" width="48" height="48"><rect x="4" y="4" width="40" height="40" rx="8" stroke="#2a2a3e" strokeWidth="2"/><path d="M16 24h16M24 16v16" stroke="#6366f1" strokeWidth="2" strokeLinecap="round"/></svg>
+                  <p style={{ fontSize: 15, fontWeight: 600, color: "#1e293b" }}>Drag sections or components here</p>
+                  <span style={{ color: "#64748b" }}>Drop any component to begin building your page layout</span>
                 </div>
-              );
-            })}
+              )}
+
+              {/* Recursive Hierarchical Root Nodes */}
+              {rootNodes.map((rootNode, idx) => (
+                <div key={rootNode.id} style={{ display: "contents" }}>
+                  {/* Root insertion slot before rootNode */}
+                  {!isPreview && (
+                    <div
+                      style={{ height: 10, width: "100%", margin: "2px 0", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragTarget({ parentId: null, index: idx }); }}
+                      onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleRootDrop(e, idx); }}
+                    >
+                      {dragTarget?.parentId === null && dragTarget?.index === idx && (
+                        <div className="bx-drop-indicator-line" />
+                      )}
+                    </div>
+                  )}
+
+                  <CanvasNode
+                    node={rootNode}
+                    nodes={nodes}
+                    selected={selected}
+                    setSelected={setSelected}
+                    multiSelected={multiSelected}
+                    setMultiSelected={setMultiSelected}
+                    updateNode={updateNode}
+                    startDrag={startDrag}
+                    isPreview={isPreview}
+                    previewDevice={previewDevice}
+                    dragTarget={dragTarget}
+                    setDragTarget={setDragTarget}
+                    onDropItem={handleDropItem}
+                    onStartNodeDrag={handleNodeDragStart}
+                    onDragEnd={handleDragEnd}
+                    draggingNodeId={draggingNodeId}
+                  />
+
+                  {/* Root insertion slot after the last rootNode */}
+                  {!isPreview && idx === rootNodes.length - 1 && (
+                    <div
+                      style={{ height: 10, width: "100%", margin: "2px 0", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragTarget({ parentId: null, index: idx + 1 }); }}
+                      onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleRootDrop(e, idx + 1); }}
+                    >
+                      {dragTarget?.parentId === null && dragTarget?.index === idx + 1 && (
+                        <div className="bx-drop-indicator-line" />
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
+
+          {/* Floating Pan Indicator */}
+          {!isPreview && (pan.x !== 0 || pan.y !== 0) && (
+            <div className="bx-canvas-pan-indicator">
+              <span>Pan: {pan.x}px, {pan.y}px</span>
+              <button
+                type="button"
+                className="bx-canvas-pan-reset-btn"
+                onClick={() => setPan({ x: 0, y: 0 })}
+                title="Reset pan to center"
+              >
+                Center
+              </button>
+            </div>
+          )}
 
           {/* Status bar */}
           {!isPreview && (
@@ -1757,7 +3445,7 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
               <span>{nodes.length} element{nodes.length !== 1 ? "s" : ""}</span>
               {selectedNode && <span>· {selectedNode.type} · {selectedNode.w}×{selectedNode.h} at ({selectedNode.x}, {selectedNode.y})</span>}
               {multiSelected.length > 1 && <span>· {multiSelected.length} selected</span>}
-              <span className="bx-statusbar-right">Shift+click to multi-select · Del to delete · Ctrl+Z undo</span>
+              <span className="bx-statusbar-right">V: Select · H: Hand (Pan) · Space+Drag: Pan · Ctrl+Z: Undo</span>
             </div>
           )}
         </div>
@@ -1766,7 +3454,9 @@ export default function Builder({ token: propToken, projectId: propProjectId, on
         {!isPreview && (
           <aside className="bx-right-panel">
             <PropertiesPanel
+              key={selectedNode?.id || "empty"}
               node={selectedNode}
+              nodes={nodes}
               onChange={updateNode}
               onDelete={deleteSelected}
               onDuplicate={duplicateSelected}

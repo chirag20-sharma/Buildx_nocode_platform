@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import archiver from 'archiver';
 import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 import Project from '../models/Project.js';
@@ -16,6 +17,19 @@ if (!fs.existsSync(deploymentsBaseDir)) {
 }
 
 // Convert string to URL-safe slug
+export const normalizeComponent = (c) => {
+    if (!c || typeof c !== 'object') return c;
+    return {
+        id: c.id,
+        type: c.type,
+        parentId: c.parentId || null,
+        order: Number.isFinite(Number(c.order)) ? Number(c.order) : 0,
+        properties: (c.properties && typeof c.properties === 'object') ? c.properties : ((c.props && typeof c.props === 'object') ? c.props : {}),
+        styles: c.styles || {},
+        position: c.position || { x: 0, y: 0 }
+    };
+};
+
 export const slugify = (text) => {
     return text
         .toString()
@@ -71,16 +85,25 @@ export const createProject = async (req, res) => {
         if (!name) {
             return respond(res, "Project name is required", 400, false);
         }
+
+        const normalizedPages = Array.isArray(settings.pages)
+            ? settings.pages.map((page) => ({
+                id: page?.id || undefined,
+                name: page?.name || "Page",
+                components: Array.isArray(page?.components) ? page.components.map(normalizeComponent) : []
+            }))
+            : [];
         
         // Create new project
         const newProject = new Project({
             name,
             description,
             userId,
-            components,
+            components: Array.isArray(components) ? components.map(normalizeComponent) : [],
             settings: {
                 theme: settings.theme || "light",
-                layout: settings.layout || "responsive"
+                layout: settings.layout || "responsive",
+                pages: normalizedPages
             }
         });
         
@@ -144,7 +167,29 @@ export const updateProject = async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.user.userId;
-        const updateData = req.body;
+
+        // Whitelist only safe client-editable fields
+        const { name, description, components, settings } = req.body;
+        const updateData = {};
+        if (name !== undefined) updateData.name = name;
+        if (description !== undefined) updateData.description = description;
+        if (components !== undefined) updateData.components = Array.isArray(components) ? components.map(normalizeComponent) : [];
+
+        if (settings && typeof settings === 'object') {
+            const normalizedPages = Array.isArray(settings.pages)
+                ? settings.pages.map((page) => ({
+                    id: page?.id || undefined,
+                    name: page?.name || "Page",
+                    components: Array.isArray(page?.components) ? page.components.map(normalizeComponent) : []
+                }))
+                : [];
+
+            updateData.settings = {
+                theme: settings.theme || "light",
+                layout: settings.layout || "responsive",
+                pages: normalizedPages
+            };
+        }
         
         // Find and update project
         const updatedProject = await Project.findOneAndUpdate(
@@ -223,7 +268,7 @@ export const publishProject = async (req, res) => {
 
         // Apply latest components/name if provided in request body
         if (components && Array.isArray(components)) {
-            project.components = components;
+            project.components = components.map(normalizeComponent);
         }
         if (name && typeof name === 'string' && name.trim().length >= 2) {
             project.name = name.trim();
@@ -336,5 +381,89 @@ export const getPublicProjectById = async (req, res) => {
     } catch (error) {
         console.log('Get public project error:', error);
         return respond(res, "Error occurred while fetching website", 500, false);
+    }
+};
+
+// Save a named version snapshot
+export const saveVersion = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.userId;
+        const { label } = req.body;
+        const project = await Project.findOne({ _id: id, userId });
+        if (!project) return respond(res, "Project not found", 404, false);
+
+        const snapshot = {
+            components: project.components,
+            settings: project.settings,
+            savedAt: new Date(),
+            label: label || `Version ${project.versions.length + 1}`
+        };
+        project.versions.push(snapshot);
+        if (project.versions.length > 20) project.versions = project.versions.slice(-20);
+        await project.save();
+        return respond(res, "Version saved", 200, true, { version: snapshot });
+    } catch (error) {
+        return respond(res, "Error saving version", 500, false);
+    }
+};
+
+// List versions
+export const listVersions = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.userId;
+        const project = await Project.findOne({ _id: id, userId }).select('versions');
+        if (!project) return respond(res, "Project not found", 404, false);
+        return respond(res, "Versions fetched", 200, true, { versions: project.versions });
+    } catch (error) {
+        return respond(res, "Error fetching versions", 500, false);
+    }
+};
+
+// Restore a version by index
+export const restoreVersion = async (req, res) => {
+    try {
+        const { id, index } = req.params;
+        const userId = req.user.userId;
+        const project = await Project.findOne({ _id: id, userId });
+        if (!project) return respond(res, "Project not found", 404, false);
+        const v = project.versions[Number(index)];
+        if (!v) return respond(res, "Version not found", 404, false);
+        project.components = v.components;
+        project.settings = v.settings;
+        await project.save();
+        return respond(res, "Version restored", 200, true, { project });
+    } catch (error) {
+        return respond(res, "Error restoring version", 500, false);
+    }
+};
+
+// Export project as ZIP (owner only)
+export const exportProject = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.userId;
+
+        const project = await Project.findOne({ _id: id, userId });
+        if (!project) return respond(res, "Project not found", 404, false);
+
+        const html = generateHTML(project);
+        const css = generateCSS(project);
+        const filename = `${project.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.zip`;
+
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        const archive = archiver('zip', { zlib: { level: 9 } });
+        archive.on('error', err => { throw err; });
+        archive.pipe(res);
+        archive.append(html, { name: 'index.html' });
+        archive.append(css, { name: 'style.css' });
+        await archive.finalize();
+    } catch (error) {
+        console.error('Export project error:', error);
+        if (!res.headersSent)
+            return respond(res, "Failed to export project", 500, false);
     }
 };

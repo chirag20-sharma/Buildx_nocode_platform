@@ -19,20 +19,23 @@
   position: relative;
 }
 
-/* ── Free-positioned Canvas Layer ── */
+/* ── Canvas Flow & Component Layers ── */
 .pub-canvas-layer {
   position: relative;
   width: 100%;
-  min-height: 400px;
+  min-height: 100vh;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .pub-comp {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
+  position: relative;
   box-sizing: border-box;
+}
+
+.pub-comp.freeform-item {
+  position: absolute !important;
 }
 
 .pub-comp-navbar {

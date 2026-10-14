@@ -35,6 +35,8 @@ const TemplateSchema = new mongoose.Schema({
   components: [{
     id:         { type: String, required: true },
     type:       { type: String, required: true },
+    parentId:   { type: String, default: null },
+    order:      { type: Number, default: 0 },
     properties: { type: mongoose.Schema.Types.Mixed, default: {} },
     styles:     { type: mongoose.Schema.Types.Mixed, default: {} },
     position:   { x: { type: Number, default: 0 }, y: { type: Number, default: 0 } }
